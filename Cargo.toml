@@ -1,0 +1,22 @@
+[package]
+name = "simple-nus3audio-gui"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nus3audio = "^1.1"
+#ubyte = "0.10"
+rodio = "0.15"
+serde = "1.0.97"
+toml = "0.5.8"
+lazy_static = "1.4"
+directories = "4"
+#[cfg(not(target_os = "windows"))]
+which = "4"
+open = "2"
+wav = "1"
+
+[dependencies.fltk]
+version = "^1.2"

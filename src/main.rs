@@ -34,8 +34,6 @@ use crate::{
 pub enum Message {
 	/// The window will re-lay itself out.
 	ReLay,
-	/// Create a new nus3audio.
-	New,
 	/// Open a nus3audio.
 	Open,
 	/// Play.
@@ -43,16 +41,16 @@ pub enum Message {
 	/// Update the seek bar.
 	Update,
 	// Seek,
-	/// Save the nus3audio.
+	/// Save the working nus3audio.
 	Save,
+	/// Save the nus3audio to a new location.
+	SaveAs,
 	/// Export a single sound.
 	ExportSingle,
 	/// Export everything.
 	ExportAll,
 	/// Replace a single sound.
 	Replace,
-	/// Set the loop status of selected audio.
-	LoopEdit,
 	/// Configure the VGAudioCli path.
 	ConfigurePath,
 	/// Show the welcome message again.
@@ -74,13 +72,6 @@ fn main() {
 	menu.set_frame(FrameType::ThinUpBox);
 
 	menu.add_emit(
-		"&File/New\t",
-		Shortcut::Ctrl | 'n',
-		MenuFlag::Normal,
-		s,
-		Message::New,
-	);
-	menu.add_emit(
 		"&File/Open nus3audio\t",
 		Shortcut::Ctrl | 'o',
 		MenuFlag::Normal,
@@ -95,14 +86,21 @@ fn main() {
 		Message::Save,
 	);
 	menu.add_emit(
-		"&File/Export single sound\t",
+		"&File/Save nus3audio as...\t",
+		Shortcut::Ctrl | Shortcut::Shift | 's',
+		MenuFlag::Normal,
+		s,
+		Message::SaveAs,
+	);
+	menu.add_emit(
+		"&File/Export single sound...\t",
 		Shortcut::Ctrl | 'e',
 		MenuFlag::Normal,
 		s,
 		Message::ExportSingle,
 	);
 	menu.add_emit(
-		"&File/Export all\t",
+		"&File/Export all...\t",
 		Shortcut::Ctrl | Shortcut::Shift | 'e',
 		MenuFlag::Normal,
 		s,
@@ -123,18 +121,11 @@ fn main() {
 		Message::PlayPause,
 	);
 	menu.add_emit(
-		"&Edit/Replace single sound\t",
+		"&Edit/Replace single sound...\t",
 		Shortcut::Ctrl | 'r',
 		MenuFlag::Normal,
 		s,
 		Message::Replace,
-	);
-	menu.add_emit(
-		"&Edit/Configure selected audio loop...\t",
-		Shortcut::empty(),
-		MenuFlag::Normal,
-		s,
-		Message::LoopEdit,
 	);
 	menu.add_emit(
 		"&Edit/Configure VGAudioCli path...\t",
@@ -169,7 +160,7 @@ fn main() {
 	// Now we need to lay the window out!
 	{
 		let (play_widget, slider_widget) = playback.get_widgets_mut();
-		layout::lay_widgets(&mut window, &mut menu, play_widget, slider_widget, file_list.get_widget_mut(), &mut start_input, &mut end_input)
+		layout::lay_widgets(&mut window, &mut menu, play_widget, slider_widget, file_list.get_widget_mut())
 	}
 
 	window.handle(move |_, event| match event {
@@ -206,7 +197,7 @@ fn main() {
 			match e {
 				Message::ReLay => {
 					let (play_widget, slider_widget) = playback.get_widgets_mut();
-					layout::lay_widgets(&mut window, &mut menu, play_widget, slider_widget, file_list.get_widget_mut(), &mut start_input, &mut end_input)
+					layout::lay_widgets(&mut window, &mut menu, play_widget, slider_widget, file_list.get_widget_mut())
 				},
 				Message::Open => {
 					let mut file_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
@@ -237,6 +228,7 @@ fn main() {
 
 						file_list.clear();
 						file_list.name = file_dialog.filename().file_name().unwrap().to_string_lossy().to_string();
+						file_list.path = Some(file_dialog.filename());
 
 						// Add the files to the list
 						for file in nus3audio.files {
@@ -253,19 +245,28 @@ fn main() {
 				Message::ExportSingle => {
 					if let Some((index, sound_name)) = file_list.selected() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-						let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path);
+
+						let mut save_dialog = NativeFileChooser::new(FileDialogType::BrowseSaveFile);
+						save_dialog.set_filter("*.wav\n*.idsp");
+						save_dialog.show();
+
+						let (extension, raw) = if let Some(extension) = save_dialog.filename().extension() {
+							if extension == "idsp" {
+								("idsp", list_item.get_idsp_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path))
+							} else {
+								("wav", list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path))
+							}
+						} else {
+							("wav", list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path))
+						};
 						if let Err(error) = raw {
 							fltk::dialog::message_title("Error");
 							alert(&window, &format!("{}", error));
 							continue
 						}
 
-						let mut save_dialog = NativeFileChooser::new(FileDialogType::BrowseSaveFile);
-						save_dialog.set_filter("*.wav");
-						save_dialog.show();
-
 						if !save_dialog.filename().to_string_lossy().is_empty() {
-							if let Err(error) = fs::write(save_dialog.filename().with_extension("wav"), &raw.unwrap()) {
+							if let Err(error) = fs::write(save_dialog.filename().with_extension(extension), &raw.unwrap()) {
 								fltk::dialog::message_title("Error");
 								alert(&window, &format!("{}", error));
 							}
@@ -331,57 +332,26 @@ fn main() {
 						alert(&window, "Nothing is selected.");
 					}
 				},
-				Message::LoopEdit => {
-					if let Some((index, _)) = file_list.selected() {
-						let sound_name = file_list.get_label_of(index).unwrap();
-						file_list.items[index].configure_loop(&window, &file_list.name, &sound_name, &settings.vgaudio_cli_path)
+				Message::Save => {
+					if file_list.path.is_some() {
+						if let Err(error) = file_list.save_nus3audio(None, &settings.vgaudio_cli_path) {
+							fltk::dialog::message_title("Error");
+							alert(&window, &format!("Error saving file:\n{}", error));
+						}
 					} else {
-						fltk::dialog::message_title("Alert");
-						alert(&window, "Nothing is selected.")
+						// Nothing to save to.
+						s.send(Message::SaveAs)
 					}
 				},
-				Message::Save => {
+				Message::SaveAs => {
 					let mut save_dialog = NativeFileChooser::new(FileDialogType::BrowseSaveFile);
 					save_dialog.set_filter("*.nus3audio");
 					save_dialog.show();
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
-						let name = save_dialog.filename().file_name().unwrap().to_string_lossy().to_string();
-						let mut nus3audio = Nus3audioFile::new();
-
-						let mut index: usize = 0;
-						loop {
-							if let Some(sound_name) = file_list.get_label_of(index) {
-								let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-
-								match list_item.get_idsp_raw(&name, &sound_name, &settings.vgaudio_cli_path) {
-									Ok(data) => {
-										nus3audio.files.push(
-											nus3audio::AudioFile {
-												id: list_item.id,
-												name: sound_name,
-												data
-											}
-										)
-									},
-									Err(error) => {
-										fltk::dialog::message_title("Error");
-										alert(&window, &format!("Error converting idsp:\n{}", error));
-										break
-									}
-								}
-								index += 1
-							} else {
-								break
-							}
-						}
-
-						let mut export: Vec<u8> = Vec::new();
-						nus3audio.write(&mut export);
-
-						if let Err(error) = fs::write(save_dialog.filename().with_extension("nus3audio"), &export) {
+						if let Err(error) = file_list.save_nus3audio(Some(&save_dialog.filename()), &settings.vgaudio_cli_path) {
 							fltk::dialog::message_title("Error");
-							alert(&window, &format!("Error writing file:\n{}", error));
+							alert(&window, &format!("Error saving file:\n{}", error));
 						}
 					}
 				},
@@ -402,8 +372,7 @@ fn main() {
 					settings.save();
 					Settings::reset_cache().expect("Failed to reset the cache directory");
 					std::process::exit(code)
-				},
-				_ => {}
+				}
 			}
 		}
 	}

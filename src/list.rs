@@ -1,13 +1,17 @@
 use std::{
 	fs,
 	io::Cursor,
-	path::Path,
+	path::{ Path, PathBuf },
 	process::Command
 };
+use nus3audio::Nus3audioFile;
 use fltk::{
-	prelude::*,
-	browser::Browser,
-	window::Window
+	prelude::{
+		BrowserExt,
+		WidgetBase,
+		WidgetExt
+	},
+	browser::Browser
 };
 use rodio::Source;
 use crate::settings::CACHEDIR;
@@ -15,6 +19,7 @@ use crate::settings::CACHEDIR;
 /// A particular list.
 pub struct List {
 	pub name: String,
+	pub path: Option<PathBuf>,
 	pub items: Vec<ListItem>,
 	widget: Browser
 }
@@ -27,6 +32,7 @@ impl List {
 		// widget.set_callback(move |c| c.emit(sender, crate::Message::ListInteracted));
 		Self {
 			name: String::new(),
+			path: None,
 			items: Vec::new(),
 			widget
 		}
@@ -36,6 +42,47 @@ impl List {
 	pub fn clear(&mut self) {
 		self.items.clear();
 		self.widget.clear()
+	}
+
+	/// Save this nus3audio to the file at `self.path`.
+	pub fn save_nus3audio(&mut self, path: Option<&Path>, vgaudio_cli: &str) -> Result<(), String> {
+		let path = if path.is_some() { path.unwrap() } else { self.path.as_ref().expect("No path has been set to save.") };
+		let name = path.file_name().unwrap().to_string_lossy().to_string();
+		let mut nus3audio = Nus3audioFile::new();
+
+		let mut index: usize = 0;
+		loop {
+			if let Some(sound_name) = self.get_label_of(index) {
+				let list_item = self.items.get_mut(index).expect("Failed to find internal list item");
+
+				match list_item.get_idsp_raw(&name, &sound_name, vgaudio_cli) {
+					Ok(data) => {
+						nus3audio.files.push(
+							nus3audio::AudioFile {
+								id: list_item.id,
+								name: sound_name,
+								data
+							}
+						)
+					},
+					Err(error) => {
+						return Err(format!("Error converting idsp:\n{}", error))
+					}
+				}
+				index += 1
+			} else {
+				break
+			}
+		}
+
+		let mut export: Vec<u8> = Vec::new();
+		nus3audio.write(&mut export);
+
+		if let Err(error) = fs::write(path.with_extension("nus3audio"), &export) {
+			Err(error.to_string())
+		} else {
+			Ok(())
+		}
 	}
 
 	/// Redraw the widget of this list.
@@ -87,37 +134,6 @@ impl ListItem {
 			bytes_per_sample: 0
 		}
 	}
-
-	pub fn configure_loop(&mut self, other_window: &Window, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) {
-		let mut window = Window::new(other_window.x(), other_window.y(), 300, 300, "Configure loop");
-		
-	}
-
-	pub fn set_loop(&mut self, loop_state: bool, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<(), String> {
-		if loop_state {
-			self.loop_points = Some((0, self.get_raw_internal(nus3audio_name, sound_name, vgaudio_cli)?.len() / self.bytes_per_sample as usize));
-			Ok(())
-		} else {
-			self.loop_points = None;
-			Ok(())
-		}
-	}
-
-	/// Set the name of this ListItem.
-	// pub fn set_name(&mut self, name: &str) {
-	// 	self.name_frame.set_label(&name)
-	// }
-
-	/// Set the size of this ListItem.
-	// pub fn set_size(&mut self) {
-	// 	self.size_frame.set_label(
-	// 		// Return the size of the raw value or 0 bytes
-	// 		&match &self.raw {
-	// 			Some(r) => r.len().bytes().to_string(),
-	// 			None => 0.bytes().to_string()
-	// 		}
-	// 	)
-	// }
 
 	/// Attach a new raw value to this item.
 	pub fn set_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {

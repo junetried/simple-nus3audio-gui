@@ -18,21 +18,30 @@ use std::{
 	time::Instant
 };
 
-/// Play button text. In this case, FLTK gives us the option to use a nice, fancy icon.
+/// Play button text. FLTK gives us the option to use a nice, fancy icon.
 const PLAY: &str = "@>";
 /// Pause button text.
 // const PAUSE: &str = "@||";
 /// The time between UI updates to the slider while actively playing audio.
 const UPDATE_FREQUENCY: f64 = 0.1;
 
+/// Struct that keeps the UI play button and controls rodio.
 pub struct Playback {
+	/// The play widget.
 	play_widget: Button,
+	/// The slider widget.
 	slider_widget: HorFillSlider,
+	/// Whether or not we should be playing.
 	playing: bool,
+	/// The instant the button was pressed.
 	start_time: Instant,
-	pause_time: Option<Instant>,
+	// Seeking in rodio is not possible. Pausing with no seek doesn't seem very useful.
+	// pause_time: Option<Instant>,
+	/// Stream handle, or the error it gave.
 	stream_handle: Result<(OutputStream, OutputStreamHandle), StreamError>,
+	/// Sink, or the error it gave.
 	sink: Option<Result<AudioSink, PlayError>>,
+	/// App sender.
 	sender: fltk::app::Sender<crate::Message>
 }
 
@@ -74,7 +83,7 @@ impl Playback {
 			slider_widget,
 			playing: false,
 			start_time: Instant::now(),
-			pause_time: None,
+			// pause_time: None,
 			stream_handle,
 			sink,
 			sender
@@ -99,19 +108,19 @@ impl Playback {
 		self.sink = Self::create_sink(&self.stream_handle)
 	}
 
-	pub fn get_time(&self) -> Instant {
-		if let Some(time) = self.pause_time {
-			self.start_time - time.elapsed()
-		} else {
-			self.start_time
-		}
-	}
+	// pub fn get_time(&self) -> Instant {
+	// 	if let Some(time) = self.pause_time {
+	// 		self.start_time - time.elapsed()
+	// 	} else {
+	// 		self.start_time
+	// 	}
+	// }
 
 	pub fn on_update(&mut self) {
 		if self.playing {
 			if let Some(sink) = &self.sink {
 				if let Ok(sink) = sink {
-					self.slider_widget.set_value(self.get_time().elapsed().as_secs_f64());
+					self.slider_widget.set_value(self.start_time.elapsed().as_secs_f64());
 					// No need to run more updates if it's paused
 					if sink.is_paused() || sink.empty() {
 						self.playing = false;
@@ -141,10 +150,12 @@ impl Playback {
 	// 	}
 	// }
 
+	/// Queue the slider update.
 	fn queue_update(sender: fltk::app::Sender<crate::Message>) {
 		fltk::app::add_timeout(UPDATE_FREQUENCY, move || sender.send(crate::Message::Update))
 	}
 
+	/// Function run when the play button is pressed.
 	pub fn on_press(&mut self, file_list: &mut crate::list::List, settings: &crate::settings::Settings) -> Result<(), String> {
 		// Stop any playback already happening
 		self.stop_sink();
@@ -162,15 +173,15 @@ impl Playback {
 							// self.play_widget.set_label(PAUSE);
 							self.playing = true;
 							sink.play();
-							if let Some(time) = self.pause_time.take() {
-								self.start_time += time.elapsed()
-							}
+							// if let Some(time) = self.pause_time.take() {
+							// 	self.start_time += time.elapsed()
+							// }
 							Self::queue_update(self.sender);
 							Ok(())
 						} else {
 							self.play_widget.set_label(PLAY);
 							sink.pause();
-							self.pause_time = Some(Instant::now());
+							// self.pause_time = Some(Instant::now());
 							Ok(())
 						}
 					} else {
@@ -223,6 +234,7 @@ impl Playback {
 		}
 	}
 
+	/// Stop the current sink.
 	pub fn stop_sink(&mut self) {
 		self.slider_widget.set_value(0.0);
 		if let Some(sink) = &mut self.sink {

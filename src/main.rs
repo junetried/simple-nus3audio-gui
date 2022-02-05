@@ -65,7 +65,7 @@ fn main() {
 	let app = app::App::default();
 	let (s, r) = app::channel();
 	let mut window = Window::new(0, 0, 250, 200, NAME);
-	// window.size_range(200, 150, i32::MAX, i32::MAX);
+	window.size_range(200, 150, 0, 0);
 
 	// Menu
 	let mut menu = MenuBar::default();

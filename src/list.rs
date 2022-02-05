@@ -175,7 +175,7 @@ impl ListItem {
 		// Need to convert the idsp to wav
 		let target_dir = CACHEDIR.join(nus3audio_name);
 		let src_file = target_dir.join(&format!("{}.idsp", sound_name));
-		let dest_file = src_file.with_extension(".wav");
+		let dest_file = src_file.with_extension("wav");
 
 		if let Err(error) = Self::create_target_dir(&target_dir) {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
@@ -202,7 +202,7 @@ impl ListItem {
 		// Need to convert the wav to idsp
 		let target_dir = CACHEDIR.join(nus3audio_name);
 		let src_file = target_dir.join(&format!("{}.wav", sound_name));
-		let dest_file = src_file.with_extension(".idsp");
+		let dest_file = src_file.with_extension("idsp");
 
 		if let Err(error) = Self::create_target_dir(&target_dir) {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))

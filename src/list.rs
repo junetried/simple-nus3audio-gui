@@ -124,7 +124,7 @@ pub struct ListItem {
 }
 
 impl ListItem {
-	// Return a new [ListItem].
+	/// Return a new [ListItem].
 	pub fn new(id: u32) -> Self {
 		Self {
 			id,
@@ -168,6 +168,7 @@ impl ListItem {
 		self.loop_points = None
 	}
 
+	/// Return a reference to the raw sound from this item. Converts the idsp first if it needs to.
 	fn get_raw_internal(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<&Vec<u8>, String> {
 		if self.raw.is_some() { return Ok(self.raw.as_ref().unwrap()) }
 		if self.idsp_raw.is_none() { unreachable!() }
@@ -191,10 +192,12 @@ impl ListItem {
 		Ok(self.raw.as_ref().unwrap())
 	}
 
+	/// Return the raw sound from this item. Converts the idsp first if it needs to.
 	pub fn get_raw(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<Vec<u8>, String> {
 		Ok(self.get_raw_internal(nus3audio_name, sound_name, vgaudio_cli)?.clone())
 	}
 
+	/// Return the idsp-format sound from this item. Converts the sound first if it needs to.
 	pub fn get_idsp_raw(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<Vec<u8>, String> {
 		if self.idsp_raw.is_some() { return Ok(self.idsp_raw.as_ref().unwrap().clone()) }
 		if self.raw.is_none() { unreachable!() }
@@ -218,6 +221,8 @@ impl ListItem {
 		Ok(self.idsp_raw.as_ref().unwrap().clone())
 	}
 
+	/// Try to empty and create the target directory. This should be in the cache directory,
+	/// to avoid deleting something we shouldn't.
 	pub fn create_target_dir(target_dir: &Path) -> Result<(), std::io::Error> {
 		if target_dir.exists() {
 			if target_dir.is_dir() {

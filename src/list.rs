@@ -268,8 +268,8 @@ impl ListItem {
 
 		if let Some(code) = output.status.code() {
 			if code != 0 {
-				let stderr = String::from_utf8(output.stderr).unwrap_or_else(|_| String::new());
-				return Err(format!("VGAudioCli returned exit code {}\n{}", code, stderr))
+				let stdout = String::from_utf8(output.stdout).unwrap_or_else(|_| String::new());
+				return Err(format!("VGAudioCli returned exit code {}\n{}", code, stdout))
 			}
 		} else {
 			return Err("VGAudio didn't return any exit code".to_string())

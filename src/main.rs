@@ -261,14 +261,14 @@ fn main() {
 						};
 						if let Err(error) = raw {
 							fltk::dialog::message_title("Error");
-							alert(&window, &format!("{}", error));
+							alert(&window, &error.to_string());
 							continue
 						}
 
 						if !save_dialog.filename().to_string_lossy().is_empty() {
 							if let Err(error) = fs::write(save_dialog.filename().with_extension(extension), &raw.unwrap()) {
 								fltk::dialog::message_title("Error");
-								alert(&window, &format!("{}", error));
+								alert(&window, &error.to_string());
 							}
 						}
 					} else {
@@ -284,8 +284,7 @@ fn main() {
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
 						let mut index: usize = 0;
-						loop {
-							if let Some(sound_name) = file_list.get_label_of(index) {
+						while let Some(sound_name) = file_list.get_label_of(index) {
 								let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 								let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path);
 								if let Err(error) = raw {
@@ -300,9 +299,6 @@ fn main() {
 									break
 								}
 								index += 1
-							} else {
-								break
-							}
 						}
 					}
 				},

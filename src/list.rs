@@ -46,13 +46,12 @@ impl List {
 
 	/// Save this nus3audio to the file at `self.path`.
 	pub fn save_nus3audio(&mut self, path: Option<&Path>, vgaudio_cli: &str) -> Result<(), String> {
-		let path = if path.is_some() { path.unwrap() } else { self.path.as_ref().expect("No path has been set to save.") };
+		let path = if let Some(path) = path { path } else { self.path.as_ref().expect("No path has been set to save.") };
 		let name = path.file_name().unwrap().to_string_lossy().to_string();
 		let mut nus3audio = Nus3audioFile::new();
 
 		let mut index: usize = 0;
-		loop {
-			if let Some(sound_name) = self.get_label_of(index) {
+		while let Some(sound_name) = self.get_label_of(index) {
 				let list_item = self.items.get_mut(index).expect("Failed to find internal list item");
 
 				match list_item.get_idsp_raw(&name, &sound_name, vgaudio_cli) {
@@ -70,9 +69,6 @@ impl List {
 					}
 				}
 				index += 1
-			} else {
-				break
-			}
 		}
 
 		let mut export: Vec<u8> = Vec::new();

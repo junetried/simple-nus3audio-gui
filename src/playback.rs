@@ -53,7 +53,7 @@ impl Playback {
 	fn create_sink(handle: &Result<(OutputStream, OutputStreamHandle), StreamError>) -> Option<Result<AudioSink, PlayError>> {
 		match handle {
 			Ok((_, handle)) => {
-				Some(AudioSink::try_new(&handle))
+				Some(AudioSink::try_new(handle))
 			},
 			Err(_) => None
 		}
@@ -91,7 +91,7 @@ impl Playback {
 	}
 
 	pub fn get_handle(&mut self) {
-		if self.stream_handle.is_ok() { return () }
+		if self.stream_handle.is_ok() { return }
 		
 		self.stream_handle = Self::create_stream_handle()
 	}
@@ -99,11 +99,7 @@ impl Playback {
 	pub fn get_sink(&mut self) {
 		self.get_handle();
 
-		if self.sink.is_some() {
-			if self.sink.as_ref().unwrap().is_ok() {
-				return ()
-			}
-		}
+		if self.sink.is_some() && self.sink.as_ref().unwrap().is_ok() { return }
 
 		self.sink = Self::create_sink(&self.stream_handle)
 	}
@@ -118,8 +114,7 @@ impl Playback {
 
 	pub fn on_update(&mut self) {
 		if self.playing {
-			if let Some(sink) = &self.sink {
-				if let Ok(sink) = sink {
+			if let Some(Ok(sink)) = &self.sink {
 					self.slider_widget.set_value(self.start_time.elapsed().as_secs_f64());
 					// No need to run more updates if it's paused
 					if sink.is_paused() || sink.empty() {
@@ -132,9 +127,6 @@ impl Playback {
 				} else {
 					self.playing = false
 				}
-			} else {
-				self.playing = false
-			}
 		}
 		// Do nothing if we aren't playing anything
 	}
@@ -188,7 +180,7 @@ impl Playback {
 						// Check if anything is selected
 						if let Some((index, sound_name)) = file_list.selected() {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-							let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path).clone();
+							let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path);
 							match raw {
 								Ok(data) => {
 									// Create a cursor for the buffer
@@ -237,14 +229,12 @@ impl Playback {
 	/// Stop the current sink.
 	pub fn stop_sink(&mut self) {
 		self.slider_widget.set_value(0.0);
-		if let Some(sink) = &mut self.sink {
-			if let Ok(sink) = sink {
+		if let Some(Ok(sink)) = &mut self.sink {
 				sink.stop();
 				self.playing = false;
 				self.play_widget.set_label(PLAY);
 				// https://github.com/RustAudio/rodio/issues/315
 				self.sink = None
-			}
 		}
 	}
 

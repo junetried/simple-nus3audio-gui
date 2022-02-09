@@ -289,7 +289,7 @@ fn main() {
 								let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 								let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path);
 								if let Err(error) = raw {
-									alert(&window, &format!("{}", error));
+									alert(&window, &error.to_string());
 									break
 								}
 								let target_file = save_dialog.filename().join(&format!("{}.wav", sound_name));

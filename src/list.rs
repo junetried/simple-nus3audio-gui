@@ -168,7 +168,7 @@ impl ListItem {
 		self.loop_points = None
 	}
 
-	pub fn get_raw_internal(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<&Vec<u8>, String> {
+	fn get_raw_internal(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<&Vec<u8>, String> {
 		if self.raw.is_some() { return Ok(self.raw.as_ref().unwrap()) }
 		if self.idsp_raw.is_none() { unreachable!() }
 

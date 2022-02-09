@@ -18,9 +18,13 @@ use crate::settings::CACHEDIR;
 
 /// A particular list.
 pub struct List {
+	/// The name of this nus3audio file.
 	pub name: String,
+	/// The path of this list's original nus3audio file.
 	pub path: Option<PathBuf>,
+	/// Items in this nus3audio file.
 	pub items: Vec<ListItem>,
+	/// The browser widget representing the file.
 	widget: Browser
 }
 

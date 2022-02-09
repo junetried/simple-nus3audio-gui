@@ -33,7 +33,9 @@ const CONFIGURE_MESSAGE: &str = "Please set the path to the VGAudioCli executabl
 
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
+	/// The path to VGAudioCli's executable.
 	pub vgaudio_cli_path: String,
+	/// Whether or not the first-time message should be displayed.
 	pub first_time: bool
 }
 

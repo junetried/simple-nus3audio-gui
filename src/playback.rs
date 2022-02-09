@@ -46,10 +46,14 @@ pub struct Playback {
 }
 
 impl Playback {
+	/// Attempt to create the stream handle.
 	fn create_stream_handle() -> Result<(OutputStream, OutputStreamHandle), StreamError> {
 		OutputStream::try_default()
 	}
 
+	/// Create the sink from the stream handle result.
+	/// 
+	/// Returns [None] if the handle is an error, otherwise tries to create the sink and returns the result in an [Option].
 	fn create_sink(handle: &Result<(OutputStream, OutputStreamHandle), StreamError>) -> Option<Result<AudioSink, PlayError>> {
 		match handle {
 			Ok((_, handle)) => {
@@ -59,6 +63,7 @@ impl Playback {
 		}
 	}
 
+	/// Create a new instance of Self.
 	pub fn new(sender: fltk::app::Sender<crate::Message>) -> Self {
 		let mut play_widget = Button::default().with_label(PLAY);
 		play_widget.set_tooltip("Play selected audio");
@@ -90,12 +95,20 @@ impl Playback {
 		}
 	}
 
+	/// Try to get the stream handle.
+	/// 
+	/// If the stream handle isn't set already, tries to create it again.
+	/// Otherwise, this does nothing.
 	pub fn get_handle(&mut self) {
 		if self.stream_handle.is_ok() { return }
 		
 		self.stream_handle = Self::create_stream_handle()
 	}
 
+	/// Try to get a sink.
+	/// 
+	/// If the current sink isn't set already, tries to create it again.
+	/// Otherwise, this does nothing.
 	pub fn get_sink(&mut self) {
 		self.get_handle();
 
@@ -112,6 +125,7 @@ impl Playback {
 	// 	}
 	// }
 
+	/// Updates the value of the slider widget to match the sink position.
 	pub fn on_update(&mut self) {
 		if self.playing {
 			if let Some(Ok(sink)) = &self.sink {
@@ -147,7 +161,7 @@ impl Playback {
 		fltk::app::add_timeout(UPDATE_FREQUENCY, move || sender.send(crate::Message::Update))
 	}
 
-	/// Function run when the play button is pressed.
+	/// Try to play the currently selected sound.
 	pub fn on_press(&mut self, file_list: &mut crate::list::List, settings: &crate::settings::Settings) -> Result<(), String> {
 		// Stop any playback already happening
 		self.stop_sink();

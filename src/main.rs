@@ -311,7 +311,7 @@ fn main() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 
 						let mut open_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
-						open_dialog.set_filter("*.{ogg,flac,wav,mp3}\n*.ogg\n*.flac\n*.wav\n*.mp3");
+						open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp");
 						open_dialog.show();
 
 						if open_dialog.filename().exists() {

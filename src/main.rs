@@ -322,7 +322,14 @@ fn main() {
 								continue
 							}
 
-							if let Err(error) = list_item.set_raw(raw.unwrap()) {
+							let result = if let Some(extension) = open_dialog.filename().extension() {
+								match extension.to_str() {
+									Some("idsp") => { list_item.set_idsp_raw(raw.unwrap()); Ok(()) },
+									_ => list_item.set_raw(raw.unwrap())
+								}
+							} else { list_item.set_raw(raw.unwrap()) };
+
+							if let Err(error) = result {
 								fltk::dialog::message_title("Error");
 								alert(&window, &format!("Could not decode file:\n{}", error));
 							}

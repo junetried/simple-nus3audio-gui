@@ -11,7 +11,7 @@ use fltk::{
 		NativeFileChooser, FileDialogType
 	},
 	enums::{
-		Event, FrameType, Shortcut
+		Cursor, Event, FrameType, Shortcut
 	},
 	menu::{
 		MenuBar, MenuFlag
@@ -231,11 +231,14 @@ fn main() {
 					file_dialog.show();
 
 					if file_dialog.filename().exists() {
+						window.set_cursor(Cursor::Wait);
+
 						// Attempt to read chosen file
 						let raw = match std::fs::read(file_dialog.filename()) {
 							Ok(r) => r,
 							Err(e) => {
 								fltk::dialog::message_title("Error");
+								window.set_cursor(Cursor::Default);
 								alert(&window, &format!("Error reading file:\n{}", e));
 								continue
 							}
@@ -246,6 +249,7 @@ fn main() {
 							Some(f) => f,
 							None => {
 								fltk::dialog::message_title("Error");
+								window.set_cursor(Cursor::Default);
 								alert(&window, "Error parsing file");
 								continue
 							}
@@ -277,7 +281,8 @@ fn main() {
 							file_list.add_item(item, &item_name);
 						};
 
-						file_list.redraw()
+						file_list.redraw();
+						window.set_cursor(Cursor::Default)
 					}
 				},
 				Message::ExportSingle => {
@@ -304,6 +309,8 @@ fn main() {
 						} else {"wav"};
 
 						if !save_dialog.filename().to_string_lossy().is_empty() {
+							window.set_cursor(Cursor::Wait);
+
 							let target_file = save_dialog.filename().with_extension(extension);
 
 							let raw = if extension == "lopus" || extension == "idsp" {
@@ -318,6 +325,7 @@ fn main() {
 
 							if let Err(error) = raw {
 								fltk::dialog::message_title("Error");
+								window.set_cursor(Cursor::Default);
 								alert(&window, &error.to_string());
 								continue
 							}
@@ -326,6 +334,8 @@ fn main() {
 								fltk::dialog::message_title("Error");
 								alert(&window, &error.to_string());
 							}
+
+							window.set_cursor(Cursor::Default)
 						}
 					} else {
 						fltk::dialog::message_title("Alert");
@@ -339,6 +349,7 @@ fn main() {
 					save_dialog.show();
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
+						window.set_cursor(Cursor::Wait);
 
 						let mut skipped = String::new();
 						let mut index: usize = 0;
@@ -350,6 +361,7 @@ fn main() {
 	
 								if let Err(error) = fs::write(target_file, raw) {
 									fltk::dialog::message_title("Error");
+									window.set_cursor(Cursor::Default);
 									alert(&window, &format!("Error writing file:\n{}", error));
 									break
 								}
@@ -364,6 +376,8 @@ fn main() {
 							fltk::dialog::message_title("Warning");
 							alert(&window, &format!("The following items have no audio and were skipped:\n{}", skipped))
 						}
+
+						window.set_cursor(Cursor::Default)
 					}
 				},
 				Message::Replace => {
@@ -375,9 +389,12 @@ fn main() {
 						open_dialog.show();
 
 						if open_dialog.filename().exists() {
+							window.set_cursor(Cursor::Wait);
+
 							let raw = fs::read(open_dialog.filename());
 							if let Err(error) = raw {
 								fltk::dialog::message_title("Error");
+								window.set_cursor(Cursor::Default);
 								alert(&window, &format!("Could not read file:\n{}", error));
 								continue
 							}
@@ -395,6 +412,8 @@ fn main() {
 								fltk::dialog::message_title("Error");
 								alert(&window, &format!("Could not decode file:\n{}", error));
 							}
+
+							window.set_cursor(Cursor::Default)
 						}
 					} else {
 						fltk::dialog::message_title("Alert");
@@ -403,9 +422,11 @@ fn main() {
 				},
 				Message::Save => {
 					if file_list.path.is_some() {
+						window.set_cursor(Cursor::Wait);
 						if let Err(error) = file_list.save_nus3audio(None, &settings) {
 							fltk::dialog::message_title("Error");
-							alert(&window, &format!("Error saving file:\n{}", error));
+							window.set_cursor(Cursor::Default);
+							alert(&window, &format!("Error saving file:\n{}", error))
 						}
 					} else {
 						// Nothing to save to.
@@ -418,9 +439,11 @@ fn main() {
 					save_dialog.show();
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
+						window.set_cursor(Cursor::Wait);
 						if let Err(error) = file_list.save_nus3audio(Some(&save_dialog.filename()), &settings) {
 							fltk::dialog::message_title("Error");
-							alert(&window, &format!("Error saving file:\n{}", error));
+							window.set_cursor(Cursor::Default);
+							alert(&window, &format!("Error saving file:\n{}", error))
 						}
 					}
 				},

@@ -38,6 +38,8 @@ pub enum Message {
 	Open,
 	/// Play.
 	PlayPause,
+	/// Stop the currently playing sound.
+	Stop,
 	/// Update the seek bar.
 	Update,
 	// Seek,
@@ -119,6 +121,13 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::PlayPause,
+	);
+	menu.add_emit(
+		"&Edit/Stop\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::Stop,
 	);
 	menu.add_emit(
 		"&Edit/Replace single sound...\t",
@@ -364,6 +373,7 @@ fn main() {
 						alert(&window, &error);
 					}
 				},
+				Message::Stop => playback.stop_sink(),
 				Message::Update => playback.on_update(),
 				// Message::Seek => playback.on_seek(),
 				Message::ConfigurePath => settings.configure_vgaudio_cli_path(&window),

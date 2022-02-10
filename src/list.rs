@@ -174,7 +174,6 @@ impl ListItem {
 
 		let mut decoded: Vec<i16> = decoder.collect();
 
-		println!("src rate: {}, target rate: {}", decoder_sample_rate, sample_rate);
 		if decoder_sample_rate != sample_rate {
 			// Need to resample
 			if header.channel_count == 1 {

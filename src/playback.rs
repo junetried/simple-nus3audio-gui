@@ -129,18 +129,18 @@ impl Playback {
 	pub fn on_update(&mut self) {
 		if self.playing {
 			if let Some(Ok(sink)) = &self.sink {
-					self.slider_widget.set_value(self.start_time.elapsed().as_secs_f64());
-					// No need to run more updates if it's paused
-					if sink.is_paused() || sink.empty() {
-						self.playing = false;
-						self.play_widget.set_label(PLAY)
-					} else {
-						Self::queue_update(self.sender)
-					}
-					self.slider_widget.redraw()
+				self.slider_widget.set_value(self.start_time.elapsed().as_secs_f64());
+				// No need to run more updates if it's paused
+				if sink.is_paused() || sink.empty() {
+					self.playing = false;
+					self.play_widget.set_label(PLAY)
 				} else {
-					self.playing = false
+					Self::queue_update(self.sender)
 				}
+				self.slider_widget.redraw()
+			} else {
+				self.playing = false
+			}
 		}
 		// Do nothing if we aren't playing anything
 	}
@@ -162,7 +162,7 @@ impl Playback {
 	}
 
 	/// Try to play the currently selected sound.
-	pub fn on_press(&mut self, file_list: &mut crate::list::List, settings: &crate::settings::Settings) -> Result<(), String> {
+	pub fn on_press(&mut self, file_list: &mut crate::list::List) -> Result<(), String> {
 		// Stop any playback already happening
 		self.stop_sink();
 
@@ -192,11 +192,11 @@ impl Playback {
 						}
 					} else {
 						// Check if anything is selected
-						if let Some((index, sound_name)) = file_list.selected() {
+						if let Some((index, _)) = file_list.selected() {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-							let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path);
+							let raw = list_item.audio_raw.clone();
 							match raw {
-								Ok(data) => {
+								Some(data) => {
 									// Create a cursor for the buffer
 									let buffer = Cursor::new(data);
 									// Create the source
@@ -222,8 +222,8 @@ impl Playback {
 										}
 									}
 								},
-								Err(error) => {
-									Err(format!("Error converting idsp:\n{}", error))
+								None => {
+									Err("Audio of selected item is empty.".to_owned())
 								}
 							}
 						} else {
@@ -244,11 +244,11 @@ impl Playback {
 	pub fn stop_sink(&mut self) {
 		self.slider_widget.set_value(0.0);
 		if let Some(Ok(sink)) = &mut self.sink {
-				sink.stop();
-				self.playing = false;
-				self.play_widget.set_label(PLAY);
-				// https://github.com/RustAudio/rodio/issues/315
-				self.sink = None
+			sink.stop();
+			self.playing = false;
+			self.play_widget.set_label(PLAY);
+			// https://github.com/RustAudio/rodio/issues/315
+			self.sink = None
 		}
 	}
 

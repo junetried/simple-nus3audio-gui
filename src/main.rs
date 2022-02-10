@@ -55,6 +55,14 @@ pub enum Message {
 	Replace,
 	/// Configure the VGAudioCli path.
 	ConfigurePath,
+	#[cfg(not(target_os = "windows"))]
+	/// Configure the .NET runtime path.
+	/// 
+	/// Exclusive to not-Windows, because Windows (likely) doesn't need this.
+	/// 
+	/// Though the .NET runtime is not configurable here in Windows,
+	/// the setting is still used there (although it defaults to an empty string).
+	ConfigureRuntimePath,
 	/// Show the welcome message again.
 	WelcomeGreeting,
 	/// Quit the application.
@@ -142,6 +150,14 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::ConfigurePath,
+	);
+	#[cfg(not(target_os = "windows"))]
+	menu.add_emit(
+		"&Edit/Configure .NET runtime path...\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::ConfigureRuntimePath,
 	);
 	menu.add_emit(
 		"&Help/VGAudioCli\t",
@@ -235,17 +251,30 @@ fn main() {
 							}
 						};
 
+						// Stop current playback before loading the file into the list
+						playback.stop_sink();
+
 						file_list.clear();
 						file_list.name = file_dialog.filename().file_name().unwrap().to_string_lossy().to_string();
 						file_list.path = Some(file_dialog.filename());
 
 						// Add the files to the list
 						for file in nus3audio.files {
-							let mut item = ListItem::new(file.id);
+							let mut item = ListItem::new(file.id, file.name.clone());
+							let mut item_name = file.name;
 
-							item.set_idsp_raw(file.data);
+							let extension = list::extension_of_encoded(&file.data);
 
-							file_list.add_item(item, &file.name)
+							if let Err(error) = item.from_encoded(&file_list.name, file.data, &item_name, &settings) {
+								fltk::dialog::message_title("Error");
+								alert(&window, &format!("Could not decode {}:\n{}", item_name, error));
+							};
+
+							if let Ok(extension) = extension {
+								item_name.push_str(&format!(".{}", extension))
+							}
+
+							file_list.add_item(item, &item_name);
 						};
 
 						file_list.redraw()
@@ -255,27 +284,45 @@ fn main() {
 					if let Some((index, sound_name)) = file_list.selected() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 
-						let mut save_dialog = NativeFileChooser::new(FileDialogType::BrowseSaveFile);
-						save_dialog.set_filter("*.wav\n*.idsp");
-						save_dialog.show();
+						// Make the default file name the sound's name, with ".wav" as the extension
+						let default = std::path::PathBuf::from(&sound_name).with_extension("wav");
 
-						let (extension, raw) = if let Some(extension) = save_dialog.filename().extension() {
-							if extension == "idsp" {
-								("idsp", list_item.get_idsp_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path))
-							} else {
-								("wav", list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path))
-							}
-						} else {
-							("wav", list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path))
-						};
-						if let Err(error) = raw {
-							fltk::dialog::message_title("Error");
-							alert(&window, &error.to_string());
-							continue
+						let mut save_dialog = NativeFileChooser::new(FileDialogType::BrowseSaveFile);
+						save_dialog.set_filter("*.wav\n*.idsp\n*.lopus");
+
+						// Set the default file name to save
+						if let Some(filename) = default.to_str() {
+							save_dialog.set_preset_file(filename)
 						}
 
+						save_dialog.show();
+
+						let extension = if let Some(extension) = save_dialog.filename().extension() {
+							if extension == "idsp" {"idsp"}
+							else if extension == "lopus" {"lopus"}
+							else {"wav"}
+						} else {"wav"};
+
 						if !save_dialog.filename().to_string_lossy().is_empty() {
-							if let Err(error) = fs::write(save_dialog.filename().with_extension(extension), &raw.unwrap()) {
+							let target_file = save_dialog.filename().with_extension(extension);
+
+							let raw = if extension == "lopus" || extension == "idsp" {
+								if let Some(name) = target_file.file_name() {
+									list_item.get_nus3_encoded_raw(&file_list.name, name, &settings)
+								} else {
+									Err("File name is empty".to_owned())
+								}
+							} else {
+								list_item.get_audio_raw()
+							};
+
+							if let Err(error) = raw {
+								fltk::dialog::message_title("Error");
+								alert(&window, &error.to_string());
+								continue
+							}
+
+							if let Err(error) = fs::write(target_file, &raw.unwrap()) {
 								fltk::dialog::message_title("Error");
 								alert(&window, &error.to_string());
 							}
@@ -292,22 +339,30 @@ fn main() {
 					save_dialog.show();
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
+
+						let mut skipped = String::new();
 						let mut index: usize = 0;
+
 						while let Some(sound_name) = file_list.get_label_of(index) {
-								let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-								let raw = list_item.get_raw(&file_list.name, &sound_name, &settings.vgaudio_cli_path);
-								if let Err(error) = raw {
-									alert(&window, &error.to_string());
-									break
-								}
+							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
+							if let Some(raw) = &list_item.audio_raw {
 								let target_file = save_dialog.filename().join(&format!("{}.wav", sound_name));
-		
-								if let Err(error) = fs::write(target_file, &raw.unwrap()) {
+	
+								if let Err(error) = fs::write(target_file, raw) {
 									fltk::dialog::message_title("Error");
 									alert(&window, &format!("Error writing file:\n{}", error));
 									break
 								}
-								index += 1
+							} else {
+								skipped.push_str(&format!("{}\n", sound_name))
+							}
+							
+							index += 1
+						}
+
+						if !skipped.is_empty() {
+							fltk::dialog::message_title("Warning");
+							alert(&window, &format!("The following items have no audio and were skipped:\n{}", skipped))
 						}
 					}
 				},
@@ -316,7 +371,7 @@ fn main() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 
 						let mut open_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
-						open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp");
+						open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp,lopus}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp\n*.lopus");
 						open_dialog.show();
 
 						if open_dialog.filename().exists() {
@@ -326,13 +381,15 @@ fn main() {
 								alert(&window, &format!("Could not read file:\n{}", error));
 								continue
 							}
+							let raw = raw.unwrap();
 
 							let result = if let Some(extension) = open_dialog.filename().extension() {
 								match extension.to_str() {
-									Some("idsp") => { list_item.set_idsp_raw(raw.unwrap()); Ok(()) },
-									_ => list_item.set_raw(raw.unwrap())
+									Some("idsp") => { list_item.from_encoded(&file_list.name, raw, &open_dialog.filename().file_name().unwrap(), &settings) },
+									Some("lopus") => { list_item.from_encoded(&file_list.name, raw, &open_dialog.filename().file_name().unwrap(), &settings) },
+									_ => list_item.set_audio_raw(raw)
 								}
-							} else { list_item.set_raw(raw.unwrap()) };
+							} else { list_item.set_audio_raw(raw) };
 
 							if let Err(error) = result {
 								fltk::dialog::message_title("Error");
@@ -346,7 +403,7 @@ fn main() {
 				},
 				Message::Save => {
 					if file_list.path.is_some() {
-						if let Err(error) = file_list.save_nus3audio(None, &settings.vgaudio_cli_path) {
+						if let Err(error) = file_list.save_nus3audio(None, &settings) {
 							fltk::dialog::message_title("Error");
 							alert(&window, &format!("Error saving file:\n{}", error));
 						}
@@ -361,14 +418,14 @@ fn main() {
 					save_dialog.show();
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
-						if let Err(error) = file_list.save_nus3audio(Some(&save_dialog.filename()), &settings.vgaudio_cli_path) {
+						if let Err(error) = file_list.save_nus3audio(Some(&save_dialog.filename()), &settings) {
 							fltk::dialog::message_title("Error");
 							alert(&window, &format!("Error saving file:\n{}", error));
 						}
 					}
 				},
 				Message::PlayPause => {
-					if let Err(error) = playback.on_press(&mut file_list, &settings) {
+					if let Err(error) = playback.on_press(&mut file_list) {
 						fltk::dialog::message_title("Error");
 						alert(&window, &error);
 					}
@@ -377,6 +434,8 @@ fn main() {
 				Message::Update => playback.on_update(),
 				// Message::Seek => playback.on_seek(),
 				Message::ConfigurePath => settings.configure_vgaudio_cli_path(&window),
+				#[cfg(not(target_os = "windows"))]
+				Message::ConfigureRuntimePath => settings.configure_vgaudio_cli_prepath(&window),
 				Message::WelcomeGreeting => {
 					settings.first_time = true;
 					settings.first_time_greeting(&window, s)

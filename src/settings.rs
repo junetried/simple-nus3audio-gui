@@ -26,15 +26,21 @@ lazy_static! {
 	pub static ref CONFIG: PathBuf = CONFIGDIR.join("settings.toml");
 }
 
-#[cfg(target_os = "windows")]
 const CONFIGURE_MESSAGE: &str = "Please set the path to the VGAudioCli executable.";
 #[cfg(not(target_os = "windows"))]
-const CONFIGURE_MESSAGE: &str = "Please set the path to the VGAudioCli executable.\nIt is recommended to use mono or dotnet over wine.";
+const CONFIGURE_RUNTIME_MESSAGE: &str = "Please set the path to the executable used to run .NET applications.
+This executable will be given the path to the VGAudioCli executable, immediately followed by arguments passed to it.
+It is recommended to use mono or dotnet over wine.";
 
 #[derive(Serialize, Deserialize)]
 pub struct Settings {
 	/// The path to VGAudioCli's executable.
 	pub vgaudio_cli_path: String,
+	/// The .NET runtime used to run VGAudioCli.
+	/// 
+	/// Though the .NET runtime is not configurable in Windows,
+	/// this setting is still used there (although it defaults to an empty string).
+	pub vgaudio_cli_prepath: String,
 	/// Whether or not the first-time message should be displayed.
 	pub first_time: bool
 }
@@ -50,18 +56,24 @@ impl Settings {
 		#[cfg(target_os = "windows")]
 		let vgaudio_cli_path = r".\VGAudioCli.exe".to_owned();
 		#[cfg(not(target_os = "windows"))]
-		let vgaudio_cli_path = {
-			if let Ok(_) = which("mono") {
-				"mono ./VGAudioCli.exe".to_owned()
-			} else if let Ok(_) = which("dotnet") {
-				"dotnet ./VGAudioCli.exe".to_owned()
+		let vgaudio_cli_path = "./VGAudioCli.exe".to_owned();
+
+		#[cfg(target_os = "windows")]
+		let vgaudio_cli_prepath = String::new();
+		#[cfg(not(target_os = "windows"))]
+		let vgaudio_cli_prepath = {
+			if which("mono").is_ok() {
+				"mono".to_owned()
+			} else if which("dotnet").is_ok() {
+				"dotnet".to_owned()
 			} else {
-				"wine ./VGAudioCli.exe".to_owned()
+				"wine".to_owned()
 			}
 		};
 
 		Self {
 			vgaudio_cli_path,
+			vgaudio_cli_prepath,
 			first_time: true
 		}
 	}
@@ -100,12 +112,11 @@ impl Settings {
 		if self.first_time {
 			message_title("Welcome");
 			let response = choice2(window, "To get started, please download a release of
-https://github.com/Thealexbarney/VGAudio/releases
-and extract it.
+https://ci.appveyor.com/project/Thealexbarney/VGAudio/build/artifacts
 Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss", "Show me", "");
 
 			if let Some(1) = response {
-				let _ = open::that("https://github.com/Thealexbarney/VGAudio/releases");
+				let _ = open::that("https://ci.appveyor.com/project/Thealexbarney/VGAudio/build/artifacts");
 				sender.send(crate::Message::ConfigurePath)
 			}
 
@@ -116,8 +127,20 @@ Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss",
 	/// Open an input dialog that allows changing the VGAudioCli path.
 	pub fn configure_vgaudio_cli_path(&mut self, window: &Window) {
 		message_title("VGAudioCli Path");
-		if let Some(string) = input(window, CONFIGURE_MESSAGE, &self.vgaudio_cli_path) {
-			self.vgaudio_cli_path = string
+		if let Some(new_path) = input(window, CONFIGURE_MESSAGE, &self.vgaudio_cli_path) {
+			self.vgaudio_cli_path = new_path
+		}
+	}
+
+	#[cfg(not(target_os = "windows"))]
+	/// Open an input dialog that allows changing the .NET runtime path.
+	/// 
+	/// Though the .NET runtime is not configurable in Windows,
+	/// this setting is still used there (although it defaults to an empty string).
+	pub fn configure_vgaudio_cli_prepath(&mut self, window: &Window) {
+		message_title(".NET Runtime Path");
+		if let Some(new_path) = input(window, CONFIGURE_RUNTIME_MESSAGE, &self.vgaudio_cli_prepath) {
+			self.vgaudio_cli_prepath = new_path
 		}
 	}
 

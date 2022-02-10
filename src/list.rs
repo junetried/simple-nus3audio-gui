@@ -16,6 +16,24 @@ use fltk::{
 use rodio::Source;
 use crate::settings::CACHEDIR;
 
+/// [nus3audio] has AudioFile::filename to do exactly this, but
+/// VGAudioCli seems to create lopus files without the header
+/// that nus3audio expects
+///
+/// Therefore, we rewrite that function here minus the fallback
+/// to .bin. Yes, this is a hack.
+pub fn extension_of_encoded(encoded: &Vec<u8>) -> Result<String, String> {
+	Ok(
+		if encoded.len() < 4 {
+			return Err("Not a valid file".to_owned())
+		} else if encoded[..4].eq(b"IDSP") {
+			"idsp"
+		} else {
+			"lopus"
+		}.to_owned()
+	)
+}
+
 /// A particular list.
 pub struct List {
 	/// The name of this nus3audio file.
@@ -49,30 +67,27 @@ impl List {
 	}
 
 	/// Save this nus3audio to the file at `self.path`.
-	pub fn save_nus3audio(&mut self, path: Option<&Path>, vgaudio_cli: &str) -> Result<(), String> {
+	pub fn save_nus3audio(&mut self, path: Option<&Path>, settings: &crate::settings::Settings) -> Result<(), String> {
 		let path = if let Some(path) = path { path } else { self.path.as_ref().expect("No path has been set to save.") };
 		let name = path.file_name().unwrap().to_string_lossy().to_string();
 		let mut nus3audio = Nus3audioFile::new();
 
-		let mut index: usize = 0;
-		while let Some(sound_name) = self.get_label_of(index) {
-				let list_item = self.items.get_mut(index).expect("Failed to find internal list item");
-
-				match list_item.get_idsp_raw(&name, &sound_name, vgaudio_cli) {
-					Ok(data) => {
-						nus3audio.files.push(
-							nus3audio::AudioFile {
-								id: list_item.id,
-								name: sound_name,
-								data
-							}
-						)
-					},
-					Err(error) => {
-						return Err(format!("Error converting idsp:\n{}", error))
-					}
+		for (index, list_item) in self.items.iter_mut().enumerate() {
+			let file_name = self.widget.text(index as i32 + 1).expect("Failed to get list item");
+			match list_item.get_nus3_encoded_raw(&name, &file_name, settings) {
+				Ok(data) => {
+					nus3audio.files.push(
+						nus3audio::AudioFile {
+							id: list_item.id,
+							name: list_item.name.to_owned(),
+							data
+						}
+					)
+				},
+				Err(error) => {
+					return Err(format!("Error converting:\n{}", error))
 				}
-				index += 1
+			}
 		}
 
 		let mut export: Vec<u8> = Vec::new();
@@ -117,26 +132,29 @@ impl List {
 /// An item in a [List].
 pub struct ListItem {
 	pub id: u32,
-	pub idsp_raw: Option<Vec<u8>>,
-	pub raw: Option<Vec<u8>>,
+	pub name: String,
+	/// Raw audio, in wav format.
+	pub audio_raw: Option<Vec<u8>>,
+	/// Currently unused.
 	pub loop_points: Option<(usize, usize)>,
+	/// Currently unused.
 	pub bytes_per_sample: u16
 }
 
 impl ListItem {
 	/// Return a new [ListItem].
-	pub fn new(id: u32) -> Self {
+	pub fn new(id: u32, name: String) -> Self {
 		Self {
 			id,
-			idsp_raw: None,
-			raw: None,
+			name,
+			audio_raw: None,
 			loop_points: None,
 			bytes_per_sample: 0
 		}
 	}
 
 	/// Attach a new raw value to this item.
-	pub fn set_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {
+	pub fn set_audio_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {
 		let cursor = Cursor::new(raw);
 		let decoder = rodio::Decoder::new(cursor);
 		if let Err(error) = decoder {
@@ -144,9 +162,35 @@ impl ListItem {
 		};
 		let decoder = decoder.unwrap();
 
-		let header = wav::Header::new(wav::WAV_FORMAT_PCM, decoder.channels(), decoder.sample_rate(), 16);
+		let decoder_sample_rate = decoder.sample_rate();
+		// The lopus format only supports these sample rates
+		let sample_rate = if decoder_sample_rate <= 8_000 {8_000}
+		else if decoder_sample_rate <= 12_000 {12_000}
+		else if decoder_sample_rate <= 16_000 {16_000}
+		else if decoder_sample_rate <= 24_000 {24_000}
+		else {48_000};
 
-		let decoded: Vec<i16> = decoder.collect();
+		let header = wav::Header::new(wav::WAV_FORMAT_PCM, decoder.channels(), sample_rate, 16);
+
+		let mut decoded: Vec<i16> = decoder.collect();
+
+		println!("src rate: {}, target rate: {}", decoder_sample_rate, sample_rate);
+		if decoder_sample_rate != sample_rate {
+			// Need to resample
+			if header.channel_count == 1 {
+				let input = fon::Audio::<fon::chan::Ch16, 1>::with_i16_buffer(decoder_sample_rate, decoded);
+
+				let mut output = fon::Audio::<fon::chan::Ch16, 1>::with_audio(sample_rate, &input);
+
+				decoded = output.as_i16_slice().to_vec()
+			} else {
+				let input = fon::Audio::<fon::chan::Ch16, 2>::with_i16_buffer(decoder_sample_rate, decoded);
+
+				let mut output = fon::Audio::<fon::chan::Ch16, 2>::with_audio(sample_rate, &input);
+
+				decoded = output.as_i16_slice().to_vec()
+			}
+		}
 
 		self.bytes_per_sample = header.bytes_per_sample;
 
@@ -155,70 +199,66 @@ impl ListItem {
 
 		wav::write(header, &wav::BitDepth::Sixteen(decoded), &mut cursor).unwrap();
 
-		self.raw = Some(written);
-		self.idsp_raw = None;
+		self.audio_raw = Some(written);
 		self.loop_points = None;
 		Ok(())
 	}
 
-	/// Attach a new raw idsp value to this item.
-	pub fn set_idsp_raw(&mut self, idsp_raw: Vec<u8>) {
-		self.idsp_raw = Some(idsp_raw);
-		self.raw = None;
-		self.loop_points = None
-	}
-
-	/// Return a reference to the raw sound from this item. Converts the idsp first if it needs to.
-	fn get_raw_internal(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<&Vec<u8>, String> {
-		if self.raw.is_some() { return Ok(self.raw.as_ref().unwrap()) }
-		if self.idsp_raw.is_none() { unreachable!() }
-
-		// Need to convert the idsp to wav
+	/// Gets the sound from an encoded file from a nus3audio file.
+	pub fn from_encoded<P>(&mut self, nus3audio_name: &str, encoded: Vec<u8>, sound_name: P, settings: &crate::settings::Settings) -> Result<(), String>
+	where P: Into<PathBuf> {
 		let target_dir = CACHEDIR.join(nus3audio_name);
-		let src_file = target_dir.join(&format!("{}.idsp", sound_name));
+
+		
+		let src_file = target_dir.join(sound_name.into()).with_extension(extension_of_encoded(&encoded)?);
+
 		let dest_file = src_file.with_extension("wav");
 
 		if let Err(error) = Self::create_target_dir(&target_dir) {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
 		};
 
-		if let Err(error) = fs::write(&src_file, self.idsp_raw.as_ref().unwrap()) {
+		if let Err(error) = fs::write(&src_file, encoded) {
 			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
 		};
 
-		let raw = self.run_vgaudio_cli(&src_file, &dest_file, vgaudio_cli)?;
-		self.raw = Some(raw);
+		let raw = self.run_vgaudio_cli(&src_file, &dest_file, settings)?;
+		self.audio_raw = Some(raw);
+		self.loop_points = None;
 
-		Ok(self.raw.as_ref().unwrap())
+		Ok(())
 	}
 
-	/// Return the raw sound from this item. Converts the idsp first if it needs to.
-	pub fn get_raw(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<Vec<u8>, String> {
-		Ok(self.get_raw_internal(nus3audio_name, sound_name, vgaudio_cli)?.clone())
+	/// Return the raw audio from this item. Returns an error if it is [None].
+	pub fn get_audio_raw(&mut self) -> Result<Vec<u8>, String> {
+		if let Some(raw) = &self.audio_raw {
+			Ok(raw.clone())
+		} else {
+			Err("Audio of selected item is empty".to_owned())
+		}
 	}
 
-	/// Return the idsp-format sound from this item. Converts the sound first if it needs to.
-	pub fn get_idsp_raw(&mut self, nus3audio_name: &str, sound_name: &str, vgaudio_cli: &str) -> Result<Vec<u8>, String> {
-		if self.idsp_raw.is_some() { return Ok(self.idsp_raw.as_ref().unwrap().clone()) }
-		if self.raw.is_none() { unreachable!() }
+	/// Return the nus3audio-encoded sound from this item. Converts the raw audio.
+	pub fn get_nus3_encoded_raw<P>(&mut self, nus3audio_name: &str, sound_name: P, settings: &crate::settings::Settings) -> Result<Vec<u8>, String>
+		where P: Into<PathBuf> {
+		if self.audio_raw.is_none() { return Err("Audio of selected item is empty".to_owned()) }
 
-		// Need to convert the wav to idsp
+		// Need to convert the wav
 		let target_dir = CACHEDIR.join(nus3audio_name);
-		let src_file = target_dir.join(&format!("{}.wav", sound_name));
-		let dest_file = src_file.with_extension("idsp");
+		let dest_file = target_dir.join(sound_name.into());
+		let src_file = dest_file.with_extension("wav");
 
 		if let Err(error) = Self::create_target_dir(&target_dir) {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
 		};
 
-		if let Err(error) = fs::write(&src_file, self.raw.as_ref().unwrap()) {
+		if let Err(error) = fs::write(&src_file, self.audio_raw.as_ref().unwrap()) {
 			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
 		};
 
-		let idsp_raw = self.run_vgaudio_cli(&src_file, &dest_file, vgaudio_cli)?;
-		self.idsp_raw = Some(idsp_raw);
+		let nus3_encoded_raw = self.run_vgaudio_cli(&src_file, &dest_file, settings)?;
 
-		Ok(self.idsp_raw.as_ref().unwrap().clone())
+		Ok(nus3_encoded_raw)
 	}
 
 	/// Try to empty and create the target directory. This should be in the cache directory,
@@ -246,17 +286,18 @@ impl ListItem {
 	}
 
 	/// Run VGAudioCli, convert `src_file` to `dest_file` and return it as bytes.
-	fn run_vgaudio_cli(&self, src_file: &Path, dest_file: &Path, vgaudio_cli: &str) -> Result<Vec<u8>, String> {
-		let mut arg_iter = vgaudio_cli.split(' ');
-		let mut command: Command;
-		if let Some(arg) = arg_iter.next() {
-			command = Command::new(arg)
-		} else {
+	fn run_vgaudio_cli(&self, src_file: &Path, dest_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
+		if settings.vgaudio_cli_path.is_empty() {
 			return Err("VGAudiCli path is empty".to_owned())
 		}
 
-		for arg in arg_iter {
-			command.arg(arg);
+		let mut command: Command;
+		if !settings.vgaudio_cli_prepath.is_empty() {
+			// Add the prepath if it isn't empty
+			command = Command::new(&settings.vgaudio_cli_prepath);
+			command.arg(&settings.vgaudio_cli_path);
+		} else {
+			command = Command::new(&settings.vgaudio_cli_path);
 		}
 
 		let output = command
@@ -273,11 +314,34 @@ impl ListItem {
 
 		if let Some(code) = output.status.code() {
 			if code != 0 {
-				let stdout = String::from_utf8(output.stdout).unwrap_or_else(|_| String::new());
-				return Err(format!("VGAudioCli returned exit code {}\n{}", code, stdout))
+				let mut error = format!("Attempted running VGAudioCli, found exit code {}\n", code);
+
+				let stdout = String::from_utf8(output.stdout);
+				let stderr = String::from_utf8(output.stderr);
+
+				if let Ok(out) = stdout {
+					if out.is_empty() {
+						error.push_str("stdout is empty\n")
+					} else {
+						error.push_str(&format!("stdout is:\n{}\n", out))
+					}
+				} else {
+					error.push_str("stdout couldn't be read\n")
+				}
+				if let Ok(err) = stderr {
+					if err.is_empty() {
+						error.push_str("stderr is empty")
+					} else {
+						error.push_str(&format!("stderr is:\n{}", err))
+					}
+				} else {
+					error.push_str("stderr couldn't be read")
+				}
+
+				return Err(error)
 			}
 		} else {
-			return Err("VGAudio didn't return any exit code".to_string())
+			return Err("Attempted running VGAudioCli, didn't get any exit code".to_string())
 		}
 
 		match fs::read(dest_file) {

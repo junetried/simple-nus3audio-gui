@@ -17,6 +17,7 @@ directories = "4"
 which = "4"
 open = "2"
 wav = "1"
+fon = "0.6"
 
 [dependencies.fltk]
 version = "^1.2"

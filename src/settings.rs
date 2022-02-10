@@ -74,7 +74,7 @@ impl Settings {
 		Self {
 			vgaudio_cli_path,
 			vgaudio_cli_prepath,
-			first_time: true
+			first_time: false
 		}
 	}
 

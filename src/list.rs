@@ -22,7 +22,7 @@ use crate::settings::CACHEDIR;
 ///
 /// Therefore, we rewrite that function here minus the fallback
 /// to .bin. Yes, this is a hack.
-pub fn extension_of_encoded(encoded: &Vec<u8>) -> Result<AudioExtension, String> {
+pub fn extension_of_encoded(encoded: &[u8]) -> Result<AudioExtension, String> {
 	Ok(
 		if encoded.len() < 4 {
 			return Err("Not a valid file".to_owned())

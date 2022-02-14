@@ -82,56 +82,56 @@ fn main() {
 	menu.set_frame(FrameType::ThinUpBox);
 
 	menu.add_emit(
-		"&File/Open nus3audio\t",
+		"&File/&Open nus3audio\t",
 		Shortcut::Ctrl | 'o',
 		MenuFlag::Normal,
 		s,
 		Message::Open,
 	);
 	menu.add_emit(
-		"&File/Save nus3audio\t",
+		"&File/&Save nus3audio\t",
 		Shortcut::Ctrl | 's',
 		MenuFlag::Normal,
 		s,
 		Message::Save,
 	);
 	menu.add_emit(
-		"&File/Save nus3audio as...\t",
+		"&File/Save nus3audio &as...\t",
 		Shortcut::Ctrl | Shortcut::Shift | 's',
 		MenuFlag::Normal,
 		s,
 		Message::SaveAs,
 	);
 	menu.add_emit(
-		"&File/Export single sound...\t",
+		"&File/&Export single sound...\t",
 		Shortcut::Ctrl | 'e',
 		MenuFlag::Normal,
 		s,
 		Message::ExportSingle,
 	);
 	menu.add_emit(
-		"&File/Export all...\t",
+		"&File/E&xport all...\t",
 		Shortcut::Ctrl | Shortcut::Shift | 'e',
 		MenuFlag::Normal,
 		s,
 		Message::ExportAll,
 	);
 	menu.add_emit(
-		"&File/Quit\t",
+		"&File/&Quit\t",
 		Shortcut::Ctrl | 'q',
 		MenuFlag::Normal,
 		s,
 		Message::Quit(0),
 	);
 	menu.add_emit(
-		"&Edit/Play\t",
-		Shortcut::from_char(' '),
+		"&Edit/&Replace single sound...\t",
+		Shortcut::Ctrl | 'r',
 		MenuFlag::Normal,
 		s,
-		Message::PlayPause,
+		Message::Replace,
 	);
 	menu.add_emit(
-		"&Edit/Configure VGAudioCli path...\t",
+		"&Edit/&Configure VGAudioCli path...\t",
 		Shortcut::empty(),
 		MenuFlag::Normal,
 		s,
@@ -139,28 +139,28 @@ fn main() {
 	);
 	#[cfg(not(target_os = "windows"))]
 	menu.add_emit(
-		"&Edit/Configure .NET runtime path...\t",
+		"&Edit/Configure .&NET runtime path...\t",
 		Shortcut::empty(),
 		MenuFlag::Normal,
 		s,
 		Message::ConfigureRuntimePath,
 	);
 	menu.add_emit(
-		"&Playback/Play\t",
+		"&Playback/&Play\t",
 		Shortcut::from_char(' '),
 		MenuFlag::Normal,
 		s,
 		Message::PlayPause,
 	);
 	menu.add_emit(
-		"&Playback/Stop\t",
+		"&Playback/&Stop\t",
 		Shortcut::empty(),
 		MenuFlag::Normal,
 		s,
 		Message::Stop,
 	);
 	menu.add_emit(
-		"&Help/VGAudioCli\t",
+		"&Help/&VGAudioCli\t",
 		Shortcut::empty(),
 		MenuFlag::Normal,
 		s,

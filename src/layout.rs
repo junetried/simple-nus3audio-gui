@@ -51,7 +51,7 @@ pub fn lay_widgets(window: &mut Window, menu: &mut MenuBar, play: &mut Button, s
 	list.set_pos(MARGIN, unallocated.y + MARGIN);
 	list.set_size(window_width - MARGIN * 2, unallocated.height - MARGIN * 2);
 
-	// Finally, redraw the windows
+	// Finally, redraw the window
 	window.redraw()
 }
 

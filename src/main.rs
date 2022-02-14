@@ -131,20 +131,6 @@ fn main() {
 		Message::PlayPause,
 	);
 	menu.add_emit(
-		"&Edit/Stop\t",
-		Shortcut::empty(),
-		MenuFlag::Normal,
-		s,
-		Message::Stop,
-	);
-	menu.add_emit(
-		"&Edit/Replace single sound...\t",
-		Shortcut::Ctrl | 'r',
-		MenuFlag::Normal,
-		s,
-		Message::Replace,
-	);
-	menu.add_emit(
 		"&Edit/Configure VGAudioCli path...\t",
 		Shortcut::empty(),
 		MenuFlag::Normal,
@@ -158,6 +144,20 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::ConfigureRuntimePath,
+	);
+	menu.add_emit(
+		"&Playback/Play\t",
+		Shortcut::from_char(' '),
+		MenuFlag::Normal,
+		s,
+		Message::PlayPause,
+	);
+	menu.add_emit(
+		"&Playback/Stop\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::Stop,
 	);
 	menu.add_emit(
 		"&Help/VGAudioCli\t",

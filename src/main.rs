@@ -269,7 +269,7 @@ fn main() {
 
 							let extension = list::extension_of_encoded(&file.data);
 
-							if let Err(error) = item.from_encoded(&file_list.name, file.data, &item_name, &settings) {
+							if let Err(error) = item.from_encoded(&file_list.name, file.data, &settings) {
 								fltk::dialog::message_title("Error");
 								alert(&window, &format!("Could not decode {}:\n{}", item_name, error));
 							};
@@ -314,11 +314,7 @@ fn main() {
 							let target_file = save_dialog.filename().with_extension(extension);
 
 							let raw = if extension == "lopus" || extension == "idsp" {
-								if let Some(name) = target_file.file_name() {
-									list_item.get_nus3_encoded_raw(&file_list.name, name, &settings)
-								} else {
-									Err("File name is empty".to_owned())
-								}
+							list_item.get_nus3_encoded_raw(&file_list.name, &settings)
 							} else {
 								list_item.get_audio_raw()
 							};
@@ -402,8 +398,8 @@ fn main() {
 
 							let result = if let Some(extension) = open_dialog.filename().extension() {
 								match extension.to_str() {
-									Some("idsp") => { list_item.from_encoded(&file_list.name, raw, &open_dialog.filename().file_name().unwrap(), &settings) },
-									Some("lopus") => { list_item.from_encoded(&file_list.name, raw, &open_dialog.filename().file_name().unwrap(), &settings) },
+									Some("idsp") => { list_item.from_encoded(&file_list.name, raw, &settings) },
+									Some("lopus") => { list_item.from_encoded(&file_list.name, raw, &settings) },
 									_ => list_item.set_audio_raw(raw)
 								}
 							} else { list_item.set_audio_raw(raw) };

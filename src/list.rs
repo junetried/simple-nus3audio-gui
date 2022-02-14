@@ -27,24 +27,24 @@ pub fn extension_of_encoded(encoded: &Vec<u8>) -> Result<AudioExtension, String>
 		if encoded.len() < 4 {
 			return Err("Not a valid file".to_owned())
 		} else if encoded[..4].eq(b"IDSP") {
-			AudioExtension::IDSP
+			AudioExtension::Idsp
 		} else {
-			AudioExtension::LOPUS
+			AudioExtension::Lopus
 		}
 	)
 }
 
 /// Possible (valid) formats for audio in a nus3audio file.
 pub enum AudioExtension {
-	IDSP,
-	LOPUS
+	Idsp,
+	Lopus
 }
 
 impl std::fmt::Display for AudioExtension {
 	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
 		match self {
-			AudioExtension::IDSP => write!(f, "idsp"),
-			AudioExtension::LOPUS => write!(f, "lopus"),
+			AudioExtension::Idsp => write!(f, "idsp"),
+			AudioExtension::Lopus => write!(f, "lopus"),
 		}
 	}
 }
@@ -162,7 +162,7 @@ impl ListItem {
 	pub fn new(name: String) -> Self {
 		Self {
 			name,
-			extension: AudioExtension::IDSP,
+			extension: AudioExtension::Idsp,
 			audio_raw: None,
 			loop_points: None,
 			bytes_per_sample: 0

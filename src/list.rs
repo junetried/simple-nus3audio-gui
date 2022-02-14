@@ -131,6 +131,7 @@ impl List {
 
 /// An item in a [List].
 pub struct ListItem {
+	/// The name of this audio.
 	pub name: String,
 	/// Raw audio, in wav format.
 	pub audio_raw: Option<Vec<u8>>,

@@ -186,13 +186,15 @@ impl ListItem {
 		else if decoder_sample_rate <= 24_000 {24_000}
 		else {48_000};
 
-		let header = wav::Header::new(wav::WAV_FORMAT_PCM, decoder.channels(), sample_rate, 16);
+		let channel_count = if decoder.channels() == 1 { 1 } else { 2 };
+
+		let header = wav::Header::new(wav::WAV_FORMAT_PCM, channel_count, sample_rate, 16);
 
 		let mut decoded: Vec<i16> = decoder.collect();
 
 		if decoder_sample_rate != sample_rate {
 			// Need to resample
-			if header.channel_count == 1 {
+			if channel_count == 1 {
 				let input = fon::Audio::<fon::chan::Ch16, 1>::with_i16_buffer(decoder_sample_rate, decoded);
 
 				let mut output = fon::Audio::<fon::chan::Ch16, 1>::with_audio(sample_rate, &input);

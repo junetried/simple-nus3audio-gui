@@ -124,6 +124,20 @@ fn main() {
 		Message::Quit(0),
 	);
 	menu.add_emit(
+		"&Edit/&Add sound\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::Add,
+	);
+	menu.add_emit(
+		"&Edit/Re&move selected sound\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::Remove,
+	);
+	menu.add_emit(
 		"&Edit/&Replace single sound...\t",
 		Shortcut::Ctrl | 'r',
 		MenuFlag::Normal,
@@ -374,6 +388,18 @@ fn main() {
 						}
 
 						window.set_cursor(Cursor::Default)
+					}
+				},
+				Message::Add => {
+					let item = ListItem::new(format!("new_sound_{}", file_list.items.len() + 1));
+					file_list.add_item(item, &format!("new_sound_{}.idsp", file_list.items.len() + 1))
+				},
+				Message::Remove => {
+					if let Some((index, _)) = file_list.selected() {
+						file_list.remove(index)
+					} else {
+						fltk::dialog::message_title("Alert");
+						alert(&window, "Nothing is selected.");
 					}
 				},
 				Message::Replace => {

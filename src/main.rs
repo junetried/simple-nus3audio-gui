@@ -51,6 +51,10 @@ pub enum Message {
 	ExportSingle,
 	/// Export everything.
 	ExportAll,
+	/// Add a single sound.
+	Add,
+	/// Remove the selected sound.
+	Remove,
 	/// Replace a single sound.
 	Replace,
 	/// Configure the VGAudioCli path.

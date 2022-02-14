@@ -7,7 +7,6 @@ pub struct Rect {
 }
 
 impl Rect {
-	#[allow(dead_code)]
 	/// Bump the x by `value` amount while keeping the width the same
 	pub fn x_bump(&mut self, value: i32) {
 		self.x += value;

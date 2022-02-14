@@ -35,6 +35,7 @@ pub fn extension_of_encoded(encoded: &[u8]) -> Result<AudioExtension, String> {
 }
 
 /// Possible (valid) formats for audio in a nus3audio file.
+#[derive(Clone, PartialEq, Eq)]
 pub enum AudioExtension {
 	Idsp,
 	Lopus
@@ -73,6 +74,12 @@ impl List {
 			items: Vec::new(),
 			widget
 		}
+	}
+
+	/// Remove an item from this list by index.
+	pub fn remove(&mut self, index: usize) {
+		self.items.remove(index);
+		self.widget.remove(index as i32 + 1)
 	}
 
 	/// Clear the items in this list.
@@ -129,6 +136,10 @@ impl List {
 
 	pub fn get_label_of(&self, line: usize) -> Option<String> {
 		self.widget.text(line as i32 + 1)
+	}
+
+	pub fn set_label_of(&mut self, line: usize, text: &str) {
+		self.widget.set_text(line as i32 + 1, text)
 	}
 
 	/// Returns the [&mut Browser] widget of this List.

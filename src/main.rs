@@ -1,3 +1,4 @@
+mod item_properties;
 mod layout;
 mod list;
 mod playback;
@@ -55,6 +56,8 @@ pub enum Message {
 	Add,
 	/// Remove the selected sound.
 	Remove,
+	/// Open sound properties window.
+	Properties,
 	/// Replace a single sound.
 	Replace,
 	/// Configure the VGAudioCli path.
@@ -140,6 +143,13 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::Remove,
+	);
+	menu.add_emit(
+		"&Edit/Sound &properties...\t",
+		Shortcut::Ctrl | 'p',
+		MenuFlag::Normal,
+		s,
+		Message::Properties,
 	);
 	menu.add_emit(
 		"&Edit/&Replace single sound...\t",
@@ -407,6 +417,21 @@ fn main() {
 						fltk::dialog::message_title("Alert");
 						alert(&window, "Nothing is selected.");
 					}
+				},
+				Message::Properties => {
+					let (index, name, extension) = if let Some((index, _)) = file_list.selected() {
+						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
+
+						item_properties::configure(list_item, &window);
+						(index, list_item.name.clone(), list_item.extension.clone())
+					} else {
+						fltk::dialog::message_title("Alert");
+						alert(&window, "Nothing is selected.");
+						continue
+					};
+
+					// Update the label of the item
+					file_list.set_label_of(index, &format!("{}.{}", name, extension))
 				},
 				Message::Replace => {
 					if let Some((index, _)) = file_list.selected() {

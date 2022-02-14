@@ -5,13 +5,21 @@ use crate::rect::Rect;
 use fltk::{
 	prelude::*,
 	browser::Browser,
-	button::Button,
+	button::{
+		Button,
+		RadioRoundButton,
+		CheckButton
+	},
 	dialog::{
 		alert as fltk_alert,
 		choice2 as fltk_choice2,
 		input as fltk_input
 	},
 	menu::MenuBar,
+	input::{
+		Input,
+		IntInput
+	},
 	// tree::Tree,
 	valuator::{
 		HorFillSlider
@@ -23,8 +31,11 @@ use fltk::{
 pub const MARGIN: i32 = 5;
 /// Height of the menu bar
 pub const MENUBAR_HEIGHT: i32 = 30;
+/// Height of radios, doesn't need to grow
+pub const RADIO_HEIGHT: i32 = 25;
 
 /// Lays out widgets given the window size.
+#[allow(clippy::too_many_arguments)]
 pub fn lay_widgets(window: &mut Window, menu: &mut MenuBar, play: &mut Button, slider: &mut HorFillSlider, list: &mut Browser) {
 	let window_width = window.width();
 	let window_height = window.height();
@@ -50,6 +61,51 @@ pub fn lay_widgets(window: &mut Window, menu: &mut MenuBar, play: &mut Button, s
 	// Now we can finally place the list
 	list.set_pos(MARGIN, unallocated.y + MARGIN);
 	list.set_size(window_width - MARGIN * 2, unallocated.height - MARGIN * 2);
+
+	// Finally, redraw the window
+	window.redraw()
+}
+
+/// Lays out property widgets given the window size.
+#[allow(clippy::too_many_arguments)]
+pub fn lay_prop_widgets(window: &mut Window, name_input: &mut Input, idsp_radio: &mut RadioRoundButton, lopus_radio: &mut RadioRoundButton, loop_toggle: &mut CheckButton, loop_from_input: &mut IntInput, loop_to_input: &mut IntInput, save_button: &mut Button) {
+	let window_width = window.width();
+	let window_height = window.height();
+
+	// Keep track of the window's space
+	let mut unallocated = Rect { x: 0, y: 0, width: window_width, height: window_height };
+
+	let increment = row_height(window_height);
+
+	// Place the name input
+	name_input.set_pos(MARGIN, MARGIN);
+	// Input will stretch across the window
+	name_input.set_size(window_width - MARGIN * 2, increment);
+	unallocated.y_bump(increment + MARGIN);
+
+	// Place the save button
+	save_button.set_pos(MARGIN, unallocated.height - MARGIN);
+	save_button.set_size((window_width / 2) - 75 - MARGIN * 2, increment);
+
+	// Place the radios
+	idsp_radio.set_pos(MARGIN, unallocated.y + MARGIN);
+	idsp_radio.set_size((window_width / 2) - MARGIN * 2, RADIO_HEIGHT);
+	lopus_radio.set_pos(MARGIN, unallocated.y + RADIO_HEIGHT + MARGIN * 2);
+	lopus_radio.set_size((window_width / 2) - MARGIN * 2, RADIO_HEIGHT);
+	unallocated.x_bump(window_width / 2);
+
+	// Place the loop toggle
+	loop_toggle.set_pos(unallocated.x + MARGIN, unallocated.y + MARGIN);
+	loop_toggle.set_size(unallocated.x - MARGIN * 2, RADIO_HEIGHT);
+	unallocated.y_bump(RADIO_HEIGHT + MARGIN);
+
+	// Place the loop input boxes
+	// Offset the width of the inputs by a little to make room for the label they have
+	loop_from_input.set_pos(unallocated.x + MARGIN + 20, unallocated.y + MARGIN);
+	loop_from_input.set_size(unallocated.x - 20 - MARGIN * 2, increment);
+	unallocated.y_bump(increment + MARGIN);
+	loop_to_input.set_pos(unallocated.x + MARGIN + 20, unallocated.y + MARGIN);
+	loop_to_input.set_size(unallocated.x - 20 - MARGIN * 2, increment);
 
 	// Finally, redraw the window
 	window.redraw()

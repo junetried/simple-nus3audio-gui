@@ -285,6 +285,7 @@ fn main() {
 
 							if let Err(error) = item.from_encoded(&file_list.name, file.data, &settings) {
 								fltk::dialog::message_title("Error");
+								window.set_cursor(Cursor::Default);
 								alert(&window, &format!("Could not decode {}:\n{}", item_name, error));
 							};
 
@@ -432,6 +433,7 @@ fn main() {
 
 							if let Err(error) = result {
 								fltk::dialog::message_title("Error");
+								window.set_cursor(Cursor::Default);
 								alert(&window, &format!("Could not decode file:\n{}", error));
 							}
 
@@ -448,8 +450,11 @@ fn main() {
 						if let Err(error) = file_list.save_nus3audio(None, &settings) {
 							fltk::dialog::message_title("Error");
 							window.set_cursor(Cursor::Default);
-							alert(&window, &format!("Error saving file:\n{}", error))
+							alert(&window, &format!("Error saving file:\n{}", error));
+							continue
 						}
+
+						window.set_cursor(Cursor::Default)
 					} else {
 						// Nothing to save to.
 						s.send(Message::SaveAs)

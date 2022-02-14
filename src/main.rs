@@ -431,7 +431,10 @@ fn main() {
 					};
 
 					// Update the label of the item
-					file_list.set_label_of(index, &format!("{}.{}", name, extension))
+					file_list.set_label_of(index, &format!("{}.{}", name, extension));
+
+					// Update the progress slider in case we were playing anything
+					playback.on_update()
 				},
 				Message::Replace => {
 					if let Some((index, _)) = file_list.selected() {

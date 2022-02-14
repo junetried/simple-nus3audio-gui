@@ -74,6 +74,8 @@ pub enum Message {
 	ConfigureRuntimePath,
 	/// Show the welcome message again.
 	WelcomeGreeting,
+	/// Open the online manual.
+	Manual,
 	/// Quit the application.
 	Quit(i32)
 }
@@ -202,6 +204,13 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::WelcomeGreeting,
+	);
+	menu.add_emit(
+		"&Help/User &manual...\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::Manual,
 	);
 
 	// Playback
@@ -535,6 +544,7 @@ fn main() {
 					settings.first_time = true;
 					settings.first_time_greeting(&window, s)
 				},
+				Message::Manual => { let _ = open::that("https://github.com/EthanWeegee/simple-nus3audio-gui/wiki/Usage-Manual"); },
 				Message::Quit(code) => {
 					settings.save();
 					Settings::reset_cache().expect("Failed to reset the cache directory");

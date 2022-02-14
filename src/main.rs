@@ -35,6 +35,8 @@ use crate::{
 pub enum Message {
 	/// The window will re-lay itself out.
 	ReLay,
+	/// Clear the working nus3audio.
+	New,
 	/// Open a nus3audio.
 	Open,
 	/// Play.
@@ -88,6 +90,13 @@ fn main() {
 	let mut menu = MenuBar::default();
 	menu.set_frame(FrameType::ThinUpBox);
 
+	menu.add_emit(
+		"&File/&New\t",
+		Shortcut::Ctrl | 'n',
+		MenuFlag::Normal,
+		s,
+		Message::New,
+	);
 	menu.add_emit(
 		"&File/&Open nus3audio\t",
 		Shortcut::Ctrl | 'o',
@@ -251,6 +260,9 @@ fn main() {
 				Message::ReLay => {
 					let (play_widget, slider_widget) = playback.get_widgets_mut();
 					layout::lay_widgets(&mut window, &mut menu, play_widget, slider_widget, file_list.get_widget_mut())
+				},
+				Message::New => {
+					file_list.clear()
 				},
 				Message::Open => {
 					let mut file_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);

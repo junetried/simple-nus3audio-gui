@@ -315,11 +315,16 @@ impl ListItem {
 			command = Command::new(&settings.vgaudio_cli_path);
 		}
 
-		let output = command
-			.arg("-c")
+		command.arg("-c")
 			.arg(src_file.as_os_str())
-			.arg(dest_file.as_os_str())
-			.output();
+			.arg(dest_file.as_os_str());
+		
+		// Add loop points if they exist
+		if let Some((from, to)) = self.loop_points {
+			command.arg("-l").arg(format!("{}-{}", from, to)).arg("--cbr").arg("--opusheader").arg("namco");
+		}
+
+		let output = command.output();
 
 		let output = if let Err(error) = output {
 			return Err(format!("Error running VGAudioCli\n{}", error))

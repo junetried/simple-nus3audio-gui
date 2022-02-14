@@ -151,10 +151,10 @@ pub struct ListItem {
 	pub extension: AudioExtension,
 	/// Raw audio, in wav format.
 	pub audio_raw: Option<Vec<u8>>,
-	/// Currently unused.
+	/// Loop points of this sound.
 	pub loop_points: Option<(usize, usize)>,
-	/// Currently unused.
-	pub bytes_per_sample: u16
+	/// Length in samples of the sound.
+	pub length_in_samples: usize
 }
 
 impl ListItem {
@@ -165,7 +165,7 @@ impl ListItem {
 			extension: AudioExtension::Idsp,
 			audio_raw: None,
 			loop_points: None,
-			bytes_per_sample: 0
+			length_in_samples: 0
 		}
 	}
 
@@ -209,7 +209,7 @@ impl ListItem {
 			}
 		}
 
-		self.bytes_per_sample = header.bytes_per_sample;
+		self.length_in_samples = decoded.len() / channel_count as usize;
 
 		let mut written: Vec<u8> = Vec::new();
 		let mut cursor = Cursor::new(&mut written);

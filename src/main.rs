@@ -290,7 +290,8 @@ fn main() {
 							};
 
 							if let Ok(extension) = extension {
-								item_name.push_str(&format!(".{}", extension))
+								item_name.push_str(&format!(".{}", extension));
+								item.extension = extension
 							}
 
 							file_list.add_item(item, &item_name);

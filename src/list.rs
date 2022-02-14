@@ -317,6 +317,7 @@ impl ListItem {
 			.arg("-c")
 			.arg(src_file.as_os_str())
 			.arg(dest_file.as_os_str())
+			.arg("--cbr")
 			.arg("--opusheader")
 			.arg("Namco")
 			.output();

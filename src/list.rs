@@ -78,7 +78,7 @@ impl List {
 				Ok(data) => {
 					nus3audio.files.push(
 						nus3audio::AudioFile {
-							id: list_item.id,
+							id: index as u32,
 							name: list_item.name.to_owned(),
 							data
 						}
@@ -131,7 +131,6 @@ impl List {
 
 /// An item in a [List].
 pub struct ListItem {
-	pub id: u32,
 	pub name: String,
 	/// Raw audio, in wav format.
 	pub audio_raw: Option<Vec<u8>>,
@@ -143,9 +142,8 @@ pub struct ListItem {
 
 impl ListItem {
 	/// Return a new [ListItem].
-	pub fn new(id: u32, name: String) -> Self {
+	pub fn new(name: String) -> Self {
 		Self {
-			id,
 			name,
 			audio_raw: None,
 			loop_points: None,

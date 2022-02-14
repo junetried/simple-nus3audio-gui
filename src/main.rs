@@ -264,7 +264,7 @@ fn main() {
 
 						// Add the files to the list
 						for file in nus3audio.files {
-							let mut item = ListItem::new(file.id, file.name.clone());
+							let mut item = ListItem::new(file.name.clone());
 							let mut item_name = file.name;
 
 							let extension = list::extension_of_encoded(&file.data);

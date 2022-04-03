@@ -162,10 +162,16 @@ pub struct ListItem {
 	pub extension: AudioExtension,
 	/// Raw audio, in wav format.
 	pub audio_raw: Option<Vec<u8>>,
-	/// Loop points of this sound.
-	pub loop_points: Option<(usize, usize)>,
+	/// Loop points of this sound in samples.
+	loop_points_samples: Option<(usize, usize)>,
+	/// Loop points of this sound in seconds.
+	loop_points_seconds: Option<(f64, f64)>,
 	/// Length in samples of the sound.
-	pub length_in_samples: usize
+	pub length_in_samples: usize,
+	/// Sample rate of the sound.
+	sample_rate: u32,
+	/// Number of channels
+	channels: u32
 }
 
 impl ListItem {
@@ -175,9 +181,35 @@ impl ListItem {
 			name,
 			extension: AudioExtension::Idsp,
 			audio_raw: None,
-			loop_points: None,
-			length_in_samples: 0
+			loop_points_samples: None,
+			loop_points_seconds: None,
+			length_in_samples: 0,
+			sample_rate: 12_000,
+			channels: 1
 		}
+	}
+
+	/// Return the loop points in samples.
+	pub fn loop_points(&self) -> &Option<(usize, usize)> {
+		&self.loop_points_samples
+	}
+
+	/// Return the loop points in seconds.
+	pub fn loop_points_seconds(&self) -> &Option<(f64, f64)> {
+		&self.loop_points_seconds
+	}
+
+	/// Set the loop points in samples.
+	pub fn set_loop_points(&mut self, loop_points: Option<(usize, usize)>) {
+		if let Some((begin, end)) = loop_points {
+			self.loop_points_seconds = Some((
+				begin as f64 / self.sample_rate as f64,
+				end as f64 / self.sample_rate as f64
+			));
+		} else {
+			self.loop_points_seconds = None;
+		}
+		self.loop_points_samples = loop_points;
 	}
 
 	/// Attach a new raw value to this item.
@@ -221,6 +253,7 @@ impl ListItem {
 		}
 
 		self.length_in_samples = decoded.len() / channel_count as usize;
+		self.sample_rate = sample_rate;
 
 		let mut written: Vec<u8> = Vec::new();
 		let mut cursor = Cursor::new(&mut written);
@@ -228,7 +261,7 @@ impl ListItem {
 		wav::write(header, &wav::BitDepth::Sixteen(decoded), &mut cursor).unwrap();
 
 		self.audio_raw = Some(written);
-		self.loop_points = None;
+		self.set_loop_points(None);
 		Ok(())
 	}
 
@@ -251,7 +284,7 @@ impl ListItem {
 
 		let raw = self.run_vgaudio_cli(&src_file, &dest_file, settings)?;
 		self.audio_raw = Some(raw);
-		self.loop_points = None;
+		self.set_loop_points(None);
 
 		Ok(())
 	}
@@ -331,7 +364,7 @@ impl ListItem {
 			.arg(dest_file.as_os_str());
 		
 		// Add loop points if they exist
-		if let Some((from, to)) = self.loop_points {
+		if let Some((from, to)) = self.loop_points_samples {
 			command.arg("-l").arg(format!("{}-{}", from, to)).arg("--cbr").arg("--opusheader").arg("namco");
 		}
 

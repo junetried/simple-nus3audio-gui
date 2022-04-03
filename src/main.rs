@@ -45,7 +45,7 @@ pub enum Message {
 	Stop,
 	/// Update the seek bar.
 	Update,
-	// Seek,
+	Seek,
 	/// Save the working nus3audio.
 	Save,
 	/// Save the nus3audio to a new location.
@@ -536,7 +536,7 @@ fn main() {
 				},
 				Message::Stop => playback.stop_sink(),
 				Message::Update => playback.on_update(),
-				// Message::Seek => playback.on_seek(),
+				Message::Seek => playback.on_seek(),
 				Message::ConfigurePath => settings.configure_vgaudio_cli_path(&window),
 				#[cfg(not(target_os = "windows"))]
 				Message::ConfigureRuntimePath => settings.configure_vgaudio_cli_prepath(&window),

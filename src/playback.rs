@@ -79,8 +79,8 @@ impl Playback {
 		// let mut slider_widget = HorNiceSlider::default();
 		let mut slider_widget = HorFillSlider::default();
 		slider_widget.set_tooltip("Position of the playing audio");
-		// slider_widget.set_callback(move |c| c.emit(sender, crate::Message::Seek));
-		slider_widget.deactivate();
+		slider_widget.set_callback(move |c| c.emit(sender, crate::Message::Seek));
+		// slider_widget.deactivate();
 		slider_widget.set_selection_color(fltk::enums::Color::Blue);
 		slider_widget.set_minimum(0.0);
 		slider_widget.set_maximum(1.0);
@@ -139,16 +139,18 @@ impl Playback {
 		// Do nothing if we aren't playing anything
 	}
 
-	// pub fn on_seek(&mut self) {
-	// 	if self.playing {
-	// 		if let Some(sink) = &mut self.sink {
-	// 			if let Ok(sink) = sink {
-	// 				println!("setting pos");
-	// 				sink.set_pos(self.slider_widget.value() as f32)
-	// 			}
-	// 		}
-	// 	}
-	// }
+	pub fn on_seek(&mut self) {
+		if self.playing {
+			self.seek(self.slider_widget.value())
+		}
+	}
+
+	pub fn seek(&mut self, to: f64) {
+		if let Some(handle) = &mut self.playing_handle {
+			let _ = handle.seek_to(to);
+			let _ = handle.resume(Self::no_tween());
+		}
+	}
 
 	/// Queue the slider update.
 	fn queue_update(sender: fltk::app::Sender<crate::Message>) {
@@ -162,7 +164,7 @@ impl Playback {
 
 		let result = match &mut self.audio_manager {
 			Ok(manager) => {
-					// Stream is fine
+				// Stream is fine
 				match &mut self.playing_handle {
 					Some(handle) if handle.state() != PlaybackState::Stopped => {
 						// Already have a playback handle
@@ -218,13 +220,13 @@ impl Playback {
 									}
 									// Create the sound data
 									let sound_data = StaticSoundData::from_cursor(buffer, settings);
-									
+	
 									match sound_data {
 										Ok(s) => {
 											let duration = s.duration();
-												self.slider_widget.set_bounds(0.0, duration.as_secs_f64());
+											self.slider_widget.set_bounds(0.0, duration.as_secs_f64());
 											self.slider_widget.set_step((duration.as_secs_f64() / 20.0).min(0.2), 2);
-											
+	
 											self.play_widget.set_label(PAUSE);
 											self.playing = true;
 											self.sender.send(crate::Message::Update);
@@ -248,12 +250,12 @@ impl Playback {
 						}
 					}
 				}
-				},
-				Err(error) => Err(error.to_string())
+			},
+			Err(error) => Err(error.to_string())
 		};
 		if let Some((begin, end)) = self.loop_points_seconds {
 			println!("from {} to {}", begin, end)
-			}
+		}
 		println!("{}", self.playing_handle.is_some());
 		result
 	}
@@ -265,7 +267,7 @@ impl Playback {
 		}
 		self.play_widget.set_label(PLAY);
 		self.slider_widget.set_value(0.0);
-			self.playing = false;
+		self.playing = false;
 		self.loop_points_seconds = None;
 		self.playing_handle = None
 	}

@@ -161,7 +161,7 @@ pub struct ListItem {
 	/// The extension of the audio in this nus3audio file.
 	pub extension: AudioExtension,
 	/// Raw audio, in wav format.
-	pub audio_raw: Option<Vec<u8>>,
+	pub audio_raw: Option<Vec<i16>>,
 	/// Loop points of this sound in samples.
 	loop_points_samples: Option<(usize, usize)>,
 	/// Loop points of this sound in seconds.
@@ -171,7 +171,7 @@ pub struct ListItem {
 	/// Sample rate of the sound.
 	sample_rate: u32,
 	/// Number of channels
-	channels: u32
+	channels: u16
 }
 
 impl ListItem {
@@ -194,6 +194,14 @@ impl ListItem {
 		&self.loop_points_samples
 	}
 
+	/// Return the ending loop point
+	pub fn loop_end(&self) -> Option<usize> {
+		match self.loop_points_samples {
+			Some((_, end)) => Some(end),
+			None => None
+		}
+	}
+
 	/// Return the loop points in seconds.
 	pub fn loop_points_seconds(&self) -> &Option<(f64, f64)> {
 		&self.loop_points_seconds
@@ -210,6 +218,16 @@ impl ListItem {
 			self.loop_points_seconds = None;
 		}
 		self.loop_points_samples = loop_points;
+	}
+
+	/// Return the number of channels in the contained audio.
+	pub fn channels(&self) -> u16 {
+		self.channels
+	}
+
+	/// Return the sample rate of the contained audio.
+	pub fn sample_rate(&self) -> u32 {
+		self.sample_rate
 	}
 
 	/// Attach a new raw value to this item.
@@ -230,8 +248,6 @@ impl ListItem {
 		else {48_000};
 
 		let channel_count = if decoder.channels() == 1 { 1 } else { 2 };
-
-		let header = wav::Header::new(wav::WAV_FORMAT_PCM, channel_count, sample_rate, 16);
 
 		let mut decoded: Vec<i16> = decoder.collect();
 
@@ -254,13 +270,9 @@ impl ListItem {
 
 		self.length_in_samples = decoded.len() / channel_count as usize;
 		self.sample_rate = sample_rate;
+		self.channels = channel_count;
 
-		let mut written: Vec<u8> = Vec::new();
-		let mut cursor = Cursor::new(&mut written);
-
-		wav::write(header, &wav::BitDepth::Sixteen(decoded), &mut cursor).unwrap();
-
-		self.audio_raw = Some(written);
+		self.audio_raw = Some(decoded);
 		self.set_loop_points(None);
 		Ok(())
 	}
@@ -282,17 +294,62 @@ impl ListItem {
 			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
 		};
 
+		// This should be in wav format now
 		let raw = self.run_vgaudio_cli(&src_file, &dest_file, settings)?;
-		self.audio_raw = Some(raw);
-		self.set_loop_points(None);
 
-		Ok(())
+		let wav_result = wav::read(&mut Cursor::new(&raw));
+
+		// Check that the wav could be read
+		match wav_result {
+			Ok((header, bitdepth)) => {
+				let raw = match bitdepth.try_into_sixteen() {
+					Ok(raw) => raw,
+					Err(bitdepth) => return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
+				};
+				self.audio_raw = Some(raw);
+				self.set_loop_points(None);
+				self.channels = header.channel_count;
+				self.sample_rate = header.sampling_rate;
+
+				Ok(())
+			},
+			Err(error) => Err(format!("Error reading returned wav\n{}", error))
+		}
 	}
 
 	/// Return the raw audio from this item. Returns an error if it is [None].
-	pub fn get_audio_raw(&mut self) -> Result<Vec<u8>, String> {
+	pub fn get_audio_raw(&mut self) -> Result<Vec<i16>, String> {
 		if let Some(raw) = &self.audio_raw {
 			Ok(raw.clone())
+		} else {
+			Err("Audio of selected item is empty".to_owned())
+		}
+	}
+
+	/// Return the audio from this item in WAV format. Yes, this is hacky.
+	/// 
+	/// Optionally take the length in samples that should be used.
+	pub fn get_audio_wav(&self, end: Option<usize>) -> Result<Vec<u8>, String> {
+		if let Some(raw) = &self.audio_raw {
+			// Make the header
+			let header = wav::Header::new(wav::WAV_FORMAT_PCM, self.channels, self.sample_rate, 16);
+			// Create the empty vec
+			let mut wav_file: Vec<u8> = Vec::new();
+			// And the cursor to write to it
+			let mut wav_cursor = Cursor::new(&mut wav_file);
+			// Get the raw slice if there is a specific sample limit
+			let raw = &raw[0..if let Some(end) = end {
+				let sample_length = end * self.channels as usize;
+				println!("raw.len() = {}, sample_length = {}", raw.len(), sample_length);
+				if raw.len() < sample_length { raw.len() } else { sample_length }
+			} else {
+				raw.len()
+			}];
+			// Finally, write the wav file
+			// I don't honestly know when this can fail...
+			if let Err(error) = wav::write(header, &wav::BitDepth::Sixteen(raw.to_vec()), &mut wav_cursor) { return Err(error.to_string())};
+
+			Ok(wav_file)
 		} else {
 			Err("Audio of selected item is empty".to_owned())
 		}
@@ -311,7 +368,7 @@ impl ListItem {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
 		};
 
-		if let Err(error) = fs::write(&src_file, self.audio_raw.as_ref().unwrap()) {
+		if let Err(error) = fs::write(&src_file, self.get_audio_wav(self.loop_end()).unwrap()) {
 			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
 		};
 

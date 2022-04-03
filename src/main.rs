@@ -365,9 +365,9 @@ fn main() {
 							let target_file = save_dialog.filename().with_extension(extension);
 
 							let raw = if extension == "lopus" || extension == "idsp" {
-							list_item.get_nus3_encoded_raw(&file_list.name, &settings)
+								list_item.get_nus3_encoded_raw(&file_list.name, &settings)
 							} else {
-								list_item.get_audio_raw()
+								list_item.get_audio_wav(None)
 							};
 
 							if let Err(error) = raw {
@@ -403,17 +403,18 @@ fn main() {
 
 						while let Some(sound_name) = file_list.get_label_of(index) {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-							if let Some(raw) = &list_item.audio_raw {
-								let target_file = save_dialog.filename().join(&format!("{}.wav", sound_name));
-	
-								if let Err(error) = fs::write(target_file, raw) {
-									fltk::dialog::message_title("Error");
-									window.set_cursor(Cursor::Default);
-									alert(&window, &format!("Error writing file:\n{}", error));
-									break
-								}
-							} else {
-								skipped.push_str(&format!("{}\n", sound_name))
+							match list_item.get_audio_wav(None) {
+								Ok(raw) => {
+									let target_file = save_dialog.filename().join(&format!("{}.wav", sound_name));
+
+									if let Err(error) = fs::write(target_file, raw) {
+										fltk::dialog::message_title("Error");
+										window.set_cursor(Cursor::Default);
+										alert(&window, &format!("Error writing file:\n{}", error));
+										break
+									}
+								},
+								Err(error) => skipped.push_str(&format!("{}: {}\n", sound_name, error))
 							}
 							
 							index += 1

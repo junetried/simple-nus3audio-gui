@@ -193,56 +193,34 @@ impl Playback {
 						// Check if anything is selected
 						if let Some((index, _)) = file_list.selected() {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-							let raw = list_item.audio_raw.clone();
-							match raw {
-								Some(mut data) => {
-									self.loop_points_seconds = list_item.loop_points_seconds().clone();
-	
-									// Set the length to the end of the loop *or* the actual length
-									let length = if false /*let Some((_, end)) = list_item.loop_points()*/ {
-										// if data.len() <= *end {
-										// 	data.len()
-										// } else {
-										// 	*end
-										// }
-										unreachable!()
-									} else {
-										data.len()
+							self.loop_points_seconds = list_item.loop_points_seconds().clone();
+
+							// Create the sound settings
+							let mut settings = StaticSoundSettings::default();
+							if let Some((begin, _)) = self.loop_points_seconds {
+								settings.loop_behavior = Some(kira::LoopBehavior { start_position: begin });
+							}
+
+							// Create the sound data
+							let sound_data = StaticSoundData::from_cursor(Cursor::new(list_item.get_audio_wav(list_item.loop_end())?), settings);
+
+							match sound_data {
+								Ok(s) => {
+									let duration = s.duration();
+									self.slider_widget.set_bounds(0.0, duration.as_secs_f64());
+									self.slider_widget.set_step((duration.as_secs_f64() / 20.0).min(0.2), 2);
+
+									self.play_widget.set_label(PAUSE);
+									self.playing = true;
+									self.sender.send(crate::Message::Update);
+									match manager.play(s) {
+										Ok(handle) => self.playing_handle = Some(handle),
+										Err(error) => return Err(error.to_string())
 									};
-									// 
-									data.resize_with(length, || panic!());
-									// Create a cursor for the buffer
-									let buffer = Cursor::new(data);
-									// Create the sound settings
-									let mut settings = StaticSoundSettings::default();
-									if let Some((begin, _)) = self.loop_points_seconds {
-										settings.loop_behavior = Some(kira::LoopBehavior { start_position: begin });
-									}
-									// Create the sound data
-									let sound_data = StaticSoundData::from_cursor(buffer, settings);
-	
-									match sound_data {
-										Ok(s) => {
-											let duration = s.duration();
-											self.slider_widget.set_bounds(0.0, duration.as_secs_f64());
-											self.slider_widget.set_step((duration.as_secs_f64() / 20.0).min(0.2), 2);
-	
-											self.play_widget.set_label(PAUSE);
-											self.playing = true;
-											self.sender.send(crate::Message::Update);
-											match manager.play(s) {
-												Ok(handle) => self.playing_handle = Some(handle),
-												Err(error) => return Err(error.to_string())
-											};
-											Ok(())
-										},
-										Err(error) => {
-											Err(format!("Could not play audio:\n{}", error))
-										}
-									}
+									Ok(())
 								},
-								None => {
-									Err("Audio of selected item is empty.".to_owned())
+								Err(error) => {
+									Err(format!("Could not play audio:\n{}", error))
 								}
 							}
 						} else {

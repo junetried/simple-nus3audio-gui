@@ -238,8 +238,14 @@ fn main() {
 		Event::Resize => {
 			s.send(Message::ReLay);
 			true
-		}
+		},
 		_ => { false }
+	});
+	window.set_callback(move |_| {
+		if app::event() == Event::Close {
+			s.send(Message::Quit(0));
+			app::program_should_quit(false)
+		}
 	});
 
 	let mut settings = Settings::new_default();
@@ -444,7 +450,10 @@ fn main() {
 					let (index, name, extension) = if let Some((index, _)) = file_list.selected() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 
-						item_properties::configure(list_item, &window);
+						if item_properties::configure(list_item, &window) {
+							// Item was modified
+							file_list.modified = true
+						}
 						(index, list_item.name.clone(), list_item.extension.clone())
 					} else {
 						fltk::dialog::message_title("Alert");
@@ -521,9 +530,20 @@ fn main() {
 				},
 				Message::Manual => { let _ = open::that("https://github.com/EthanWeegee/simple-nus3audio-gui/wiki/Usage-Manual"); },
 				Message::Quit(code) => {
-					settings.save();
-					Settings::reset_cache().expect("Failed to reset the cache directory");
-					std::process::exit(code)
+					if file_list.modified {
+						fltk::dialog::message_title("Warning");
+						let response = layout::choice2(&window, "You have currently unsaved changes.\nWould you still like to quit?", "Quit", "Go back", "");
+
+						if let Some(0) = response {
+							settings.save();
+							Settings::reset_cache().expect("Failed to reset the cache directory");
+							fltk::app::quit();
+							std::process::exit(code)
+						}
+					} else {
+						fltk::app::quit();
+						std::process::exit(code)
+					}
 				}
 			}
 		}

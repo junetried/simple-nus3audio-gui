@@ -31,7 +31,8 @@ enum PropMessage {
 	Save
 }
 
-pub fn configure(item: &mut ListItem, parent: &Window) {
+/// Configure a single item. Returns a boolean representing whether or not the item was modified.
+pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 	let (s, r) = app::channel();
 
 	let mut window = Window::new(parent.x(), parent.y(), 350, 125, Some("Properties"))
@@ -146,6 +147,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) {
 			Some((loop_from_input.value().parse().unwrap_or(0), loop_to_input.value().parse().unwrap_or(0)))
 		} else {
 			None
-		})
-	}
+		});
+		true
+	} else { false }
 }

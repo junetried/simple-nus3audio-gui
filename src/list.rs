@@ -59,6 +59,8 @@ pub struct List {
 	pub path: Option<PathBuf>,
 	/// Items in this nus3audio file.
 	pub items: Vec<ListItem>,
+	/// Whether or not this list has been modified. This is used to track unsaved changes.
+	pub modified: bool,
 	/// The browser widget representing the file.
 	widget: Browser,
 	/// The last browse directory of the replace dialog
@@ -75,6 +77,7 @@ impl List {
 			name: String::new(),
 			path: None,
 			items: Vec::new(),
+			modified: false,
 			widget,
 			browser_path: None
 		}
@@ -83,13 +86,15 @@ impl List {
 	/// Remove an item from this list by index.
 	pub fn remove(&mut self, index: usize) {
 		self.items.remove(index);
-		self.widget.remove(index as i32 + 1)
+		self.widget.remove(index as i32 + 1);
+		self.modified = true;
 	}
 
 	/// Clear the items in this list.
 	pub fn clear(&mut self) {
 		self.items.clear();
-		self.widget.clear()
+		self.widget.clear();
+		self.modified = false
 	}
 
 	/// Replace a sound at `index` via a file dialog.
@@ -125,11 +130,12 @@ impl List {
 				}
 			} else { list_item.set_audio_raw(raw) };
 
-			list_item.set_loop_points(ListItem::loop_points_of(&open_dialog.filename(), settings));
-
 			if let Err(error) = result {
 				return Err(format!("Could not decode file:\n{}", error))
 			}
+
+			list_item.set_loop_points(ListItem::loop_points_of(&open_dialog.filename(), settings));
+			self.modified = true;
 
 			Ok(())
 		} else {
@@ -160,6 +166,7 @@ impl List {
 		if let Err(error) = fs::write(path.with_extension("nus3audio"), &export) {
 			Err(error.to_string())
 		} else {
+			self.modified = false;
 			Ok(())
 		}
 	}
@@ -193,7 +200,8 @@ impl List {
 	/// Adds an item to the list.
 	pub fn add_item(&mut self, item: ListItem, name: &str) {
 		self.items.push(item);
-		self.widget.add(name)
+		self.widget.add(name);
+		self.modified = true
 	}
 }
 

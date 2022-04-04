@@ -11,7 +11,8 @@ use fltk::{
 		WidgetBase,
 		WidgetExt
 	},
-	browser::Browser
+	browser::Browser,
+	dialog::{ FileDialogType, NativeFileChooser }
 };
 use rodio::Source;
 use crate::settings::CACHEDIR;
@@ -59,7 +60,9 @@ pub struct List {
 	/// Items in this nus3audio file.
 	pub items: Vec<ListItem>,
 	/// The browser widget representing the file.
-	widget: Browser
+	widget: Browser,
+	/// The last browse directory of the replace dialog
+	browser_path: Option<PathBuf>
 }
 
 impl List {
@@ -72,7 +75,8 @@ impl List {
 			name: String::new(),
 			path: None,
 			items: Vec::new(),
-			widget
+			widget,
+			browser_path: None
 		}
 	}
 
@@ -86,6 +90,49 @@ impl List {
 	pub fn clear(&mut self) {
 		self.items.clear();
 		self.widget.clear()
+	}
+
+	/// Replace a sound at `index` via a file dialog.
+	pub fn replace(&mut self, index: usize, settings: &crate::Settings) -> Result<(), String> {
+		let list_item = match self.items.get_mut(index) {
+			Some(item) => item,
+			None => return Err("Failed to find internal list item.\nYou shouldn't be seeing this during normal use.".to_owned())
+		};
+
+		let mut open_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
+		open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp,lopus}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp\n*.lopus");
+		// Set the default path to the last path used
+		if let Some(path) = &self.browser_path {
+			let _ = open_dialog.set_directory(path);
+		}
+		open_dialog.show();
+
+		if open_dialog.filename().exists() {
+			// Set the last path used to the path we just used
+			self.browser_path = open_dialog.filename().parent().map(|path| path.to_owned());
+
+			let raw = fs::read(open_dialog.filename());
+			if let Err(error) = raw {
+				return Err(format!("Could not read file:\n{}", error))
+			}
+			let raw = raw.unwrap();
+
+			let result = if let Some(extension) = open_dialog.filename().extension() {
+				match extension.to_str() {
+					Some("idsp") => { list_item.from_encoded(&self.name, raw, settings) },
+					Some("lopus") => { list_item.from_encoded(&self.name, raw, settings) },
+					_ => list_item.set_audio_raw(raw)
+				}
+			} else { list_item.set_audio_raw(raw) };
+
+			if let Err(error) = result {
+				return Err(format!("Could not decode file:\n{}", error))
+			}
+
+			Ok(())
+		} else {
+			Ok(())
+		}
 	}
 
 	/// Save this nus3audio to the file at `self.path`.

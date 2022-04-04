@@ -460,40 +460,14 @@ fn main() {
 				},
 				Message::Replace => {
 					if let Some((index, _)) = file_list.selected() {
-						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-
-						let mut open_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
-						open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp,lopus}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp\n*.lopus");
-						open_dialog.show();
-
-						if open_dialog.filename().exists() {
-							window.set_cursor(Cursor::Wait);
-
-							let raw = fs::read(open_dialog.filename());
-							if let Err(error) = raw {
-								fltk::dialog::message_title("Error");
-								window.set_cursor(Cursor::Default);
-								alert(&window, &format!("Could not read file:\n{}", error));
-								continue
-							}
-							let raw = raw.unwrap();
-
-							let result = if let Some(extension) = open_dialog.filename().extension() {
-								match extension.to_str() {
-									Some("idsp") => { list_item.from_encoded(&file_list.name, raw, &settings) },
-									Some("lopus") => { list_item.from_encoded(&file_list.name, raw, &settings) },
-									_ => list_item.set_audio_raw(raw)
-								}
-							} else { list_item.set_audio_raw(raw) };
-
-							if let Err(error) = result {
-								fltk::dialog::message_title("Error");
-								window.set_cursor(Cursor::Default);
-								alert(&window, &format!("Could not decode file:\n{}", error));
-							}
-
-							window.set_cursor(Cursor::Default)
+						window.set_cursor(Cursor::Wait);
+						if let Err(error) = file_list.replace(index, &settings) {
+							fltk::dialog::message_title("Error");
+							window.set_cursor(Cursor::Default);
+							alert(&window, &error.to_string());
+							continue
 						}
+						window.set_cursor(Cursor::Default);
 					} else {
 						fltk::dialog::message_title("Alert");
 						alert(&window, "Nothing is selected.");

@@ -430,18 +430,21 @@ impl ListItem {
 	}
 
 	/// Run VGAudioCli, convert `src_file` to `dest_file` and return it as bytes.
-	fn run_vgaudio_cli(&self, src_file: &Path, dest_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
-		if settings.vgaudio_cli_path.is_empty() {
+		let vgaudio_cli_path = settings.vgaudio_cli_path();
+		if vgaudio_cli_path.is_empty() {
 			return Err("VGAudiCli path is empty".to_owned())
 		}
 
 		let mut command: Command;
-		if !settings.vgaudio_cli_prepath.is_empty() {
+		match settings.vgaudio_cli_prepath() {
+			vgaudio_cli_prepath if !vgaudio_cli_prepath.is_empty() => {
 			// Add the prepath if it isn't empty
-			command = Command::new(&settings.vgaudio_cli_prepath);
-			command.arg(&settings.vgaudio_cli_path);
-		} else {
-			command = Command::new(&settings.vgaudio_cli_path);
+				command = Command::new(vgaudio_cli_prepath);
+				command.arg(vgaudio_cli_path);
+			},
+			_ => {
+				command = Command::new(vgaudio_cli_path);
+			}
 		}
 
 		command.arg("-c")

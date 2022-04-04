@@ -516,7 +516,7 @@ fn main() {
 				#[cfg(not(target_os = "windows"))]
 				Message::ConfigureRuntimePath => settings.configure_vgaudio_cli_prepath(&window),
 				Message::WelcomeGreeting => {
-					settings.first_time = true;
+					settings.set_first_time(true);
 					settings.first_time_greeting(&window, s)
 				},
 				Message::Manual => { let _ = open::that("https://github.com/EthanWeegee/simple-nus3audio-gui/wiki/Usage-Manual"); },

@@ -12,8 +12,6 @@ nus3audio = "^1.1"
 kira = "0.6"
 # Audio decoding
 rodio = "0.15"
-# De/Serialize settings
-serde = "1.0.97"
 # TOML settings
 toml = "0.5.8"
 lazy_static = "1.4"
@@ -28,6 +26,8 @@ open = "2"
 wav = "1"
 # Audio resampler
 fon = "0.6"
+# Reading vgmstream metadata output as JSON
+json = "0.12"
 
 [dependencies.fltk]
 # Graphics toolkit

@@ -141,13 +141,21 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 
 	// Window has been closed, so now apply the settings
 	if apply {
-		item.name = name_input.value();
-		item.extension = if idsp_radio.is_toggled() { AudioExtension::Idsp } else { AudioExtension::Lopus };
-		item.set_loop_points(if loop_toggle.is_checked() {
+		let mut modified = false;
+
+		let new_name = name_input.value();
+		let new_extension = if idsp_radio.is_toggled() { AudioExtension::Idsp } else { AudioExtension::Lopus };
+		let new_loop = if loop_toggle.is_checked() {
 			Some((loop_from_input.value().parse().unwrap_or(0), loop_to_input.value().parse().unwrap_or(0)))
 		} else {
 			None
-		});
-		true
+		};
+
+		if item.name == new_name && item.extension == new_extension && *item.loop_points() == new_loop { } else { modified = true }
+
+		item.name = new_name;
+		item.extension = new_extension;
+		item.set_loop_points(new_loop);
+		modified
 	} else { false }
 }

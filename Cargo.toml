@@ -6,19 +6,29 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Un/Packing nus3audio files
 nus3audio = "^1.1"
-#ubyte = "0.10"
+# Audio playback
 kira = "0.6"
+# Audio decoding
 rodio = "0.15"
+# De/Serialize settings
 serde = "1.0.97"
+# TOML settings
 toml = "0.5.8"
 lazy_static = "1.4"
+# Getting a settings directory
 directories = "4"
+# Find one of mono, dotnet, or wine (On targets that are not Windows)
 #[cfg(not(target_os = "windows"))]
 which = "4"
+# Open the browser
 open = "2"
+# WAV encoding
 wav = "1"
+# Audio resampler
 fon = "0.6"
 
 [dependencies.fltk]
+# Graphics toolkit
 version = "^1.2"

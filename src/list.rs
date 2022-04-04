@@ -196,10 +196,7 @@ impl ListItem {
 
 	/// Return the ending loop point
 	pub fn loop_end(&self) -> Option<usize> {
-		match self.loop_points_samples {
-			Some((_, end)) => Some(end),
-			None => None
-		}
+		self.loop_points_samples.map(|(_, end)| end)
 	}
 
 	/// Return the loop points in seconds.

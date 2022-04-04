@@ -193,7 +193,7 @@ impl Playback {
 						// Check if anything is selected
 						if let Some((index, _)) = file_list.selected() {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-							self.loop_points_seconds = list_item.loop_points_seconds().clone();
+							self.loop_points_seconds = *list_item.loop_points_seconds();
 
 							// Create the sound settings
 							let mut settings = StaticSoundSettings::default();

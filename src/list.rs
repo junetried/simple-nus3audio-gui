@@ -142,8 +142,7 @@ impl List {
 		let mut nus3audio = Nus3audioFile::new();
 
 		for (index, list_item) in self.items.iter_mut().enumerate() {
-			match list_item.get_nus3_encoded_raw(&name, settings) {
-				Ok(data) => {
+			let data = list_item.get_nus3_encoded_raw(&name, settings).unwrap_or_else(|_| Vec::new());
 					nus3audio.files.push(
 						nus3audio::AudioFile {
 							id: index as u32,
@@ -151,11 +150,6 @@ impl List {
 							data
 						}
 					)
-				},
-				Err(error) => {
-					return Err(format!("Error converting:\n{}", error))
-				}
-			}
 		}
 
 		let mut export: Vec<u8> = Vec::new();

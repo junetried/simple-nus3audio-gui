@@ -141,7 +141,7 @@ impl Settings {
 	/// Though the .NET runtime is not configurable in Windows,
 	/// this setting is still used there (although it defaults to an empty string).
 	pub fn vgaudio_cli_prepath(&self) -> &str {
-		let value = self.toml.get::<str>(VGAUDIO_CLI_PREPATH);
+		let value = self.0.get::<str>(VGAUDIO_CLI_PREPATH);
 		if let Some(toml::Value::String(value)) = value {
 			value
 		} else {

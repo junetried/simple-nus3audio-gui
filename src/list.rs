@@ -220,6 +220,15 @@ impl ListItem {
 	/// Attach a new raw value to this item.
 	pub fn set_audio_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {
 		let cursor = Cursor::new(raw);
+
+		// It would be nice to use Kira for this,
+		// but it seems to coerce everything into dual channel,
+		// which isn't ideal.
+		// 
+		// I've considered using the Symphonia crate, but it looks far
+		// too complicated to use for something otherwise so simple.
+		// For example, this is the basic "decoding audio" mock-up:
+		// https://github.com/pdeljanov/Symphonia/blob/master/symphonia/examples/getting-started.rs#L53
 		let decoder = rodio::Decoder::new(cursor);
 		if let Err(error) = decoder {
 			return Err(error.to_string())

@@ -125,6 +125,8 @@ impl List {
 				}
 			} else { list_item.set_audio_raw(raw) };
 
+			list_item.set_loop_points(ListItem::loop_points_of(&open_dialog.filename(), settings));
+
 			if let Err(error) = result {
 				return Err(format!("Could not decode file:\n{}", error))
 			}
@@ -143,13 +145,13 @@ impl List {
 
 		for (index, list_item) in self.items.iter_mut().enumerate() {
 			let data = list_item.get_nus3_encoded_raw(&name, settings).unwrap_or_else(|_| Vec::new());
-					nus3audio.files.push(
-						nus3audio::AudioFile {
-							id: index as u32,
-							name: list_item.name.to_owned(),
-							data
-						}
-					)
+			nus3audio.files.push(
+				nus3audio::AudioFile {
+					id: index as u32,
+					name: list_item.name.to_owned(),
+					data
+				}
+			)
 		}
 
 		let mut export: Vec<u8> = Vec::new();
@@ -317,11 +319,8 @@ impl ListItem {
 	/// Gets the sound from an encoded file from a nus3audio file.
 	pub fn from_encoded(&mut self, nus3audio_name: &str, encoded: Vec<u8>, settings: &crate::settings::Settings) -> Result<(), String> {
 		let target_dir = CACHEDIR.join(nus3audio_name);
-
 		
 		let src_file = target_dir.join(&self.name).with_extension(extension_of_encoded(&encoded)?.to_string());
-
-		let dest_file = src_file.with_extension("wav");
 
 		if let Err(error) = Self::create_target_dir(&target_dir) {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
@@ -332,7 +331,9 @@ impl ListItem {
 		};
 
 		// This should be in wav format now
-		let raw = self.run_vgaudio_cli(&src_file, &dest_file, settings)?;
+		let raw = self.decode(&src_file, settings)?;
+
+		let loop_points = Self::loop_points_of(&src_file, settings);
 
 		let wav_result = wav::read(&mut Cursor::new(&raw));
 
@@ -344,7 +345,7 @@ impl ListItem {
 					Err(bitdepth) => return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
 				};
 				self.audio_raw = Some(raw);
-				self.set_loop_points(None);
+				self.set_loop_points(loop_points);
 				self.channels = header.channel_count;
 				self.sample_rate = header.sampling_rate;
 
@@ -400,7 +401,7 @@ impl ListItem {
 			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
 		};
 
-		let nus3_encoded_raw = self.run_vgaudio_cli(&src_file, &dest_file, settings)?;
+		let nus3_encoded_raw = self.vgaudio_cli_decode(&src_file, &dest_file, settings)?;
 
 		Ok(nus3_encoded_raw)
 	}
@@ -429,7 +430,48 @@ impl ListItem {
 		Ok(())
 	}
 
+	/// Decode `src_file` to a WAV file as bytes.
+	/// 
+	/// Might use vgmstream or VGAudioCli depending on which one is available to use.
+	fn decode(&self, src_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
+		if settings.prefer_vgmstream_decode() {
+			if !settings.vgmstream_path().is_empty() {
+				Self::vgmstream_decode(&src_file, settings)
+			} else {
+				self.vgaudio_cli_decode(&src_file, &src_file.with_extension("wav"), settings)
+			}
+		} else {
+			if !settings.vgaudio_cli_path().is_empty() {
+				self.vgaudio_cli_decode(&src_file, &src_file.with_extension("wav"), settings)
+			} else {
+				Self::vgmstream_decode(&src_file, settings)
+			}
+		}
+	}
+
+	/// Return loop points associated with `src_file`.
+	/// 
+	/// Requires vgmstream to be present and working, and will silently fail otherwise.
+	pub fn loop_points_of(src_file: &Path, settings: &crate::settings::Settings) -> Option<(usize, usize)> {
+		// Check if we can get metadata from this file
+		if let Ok(metadata) = Self::vgmstream_metadata(src_file, settings) {
+			// Check if the metadata has the "loopingInfo" object
+			if let json::JsonValue::Object(loop_info) = &metadata["loopingInfo"] {
+				// Check that the "start" and "end" numbers can be read as usize
+				if let (Some(start), Some(end)) = (loop_info["start"].as_usize(), loop_info["end"].as_usize()) {
+					// Check that the end is placed after the start
+					if end > start {
+						return Some((start, end))
+					}
+				}
+			}
+		}
+
+		None
+	}
+
 	/// Run VGAudioCli, convert `src_file` to `dest_file` and return it as bytes.
+	fn vgaudio_cli_decode(&self, src_file: &Path, dest_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
 		let vgaudio_cli_path = settings.vgaudio_cli_path();
 		if vgaudio_cli_path.is_empty() {
 			return Err("VGAudiCli path is empty".to_owned())
@@ -438,7 +480,7 @@ impl ListItem {
 		let mut command: Command;
 		match settings.vgaudio_cli_prepath() {
 			vgaudio_cli_prepath if !vgaudio_cli_prepath.is_empty() => {
-			// Add the prepath if it isn't empty
+				// Add the prepath if it isn't empty
 				command = Command::new(vgaudio_cli_prepath);
 				command.arg(vgaudio_cli_path);
 			},
@@ -499,6 +541,129 @@ impl ListItem {
 		match fs::read(dest_file) {
 			Ok(bytes) => Ok(bytes),
 			Err(error) => Err(format!("Error reading destination file {:?}\n{}", dest_file, error))
+		}
+	}
+
+	/// Run vgmstream, decode `src_file` and return it as bytes.
+	fn vgmstream_decode(src_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
+		let vgmstream_path = settings.vgmstream_path();
+		if vgmstream_path.is_empty() {
+			return Err("vgmstream path is empty".to_owned())
+		}
+
+		// Create the command
+		let mut command = Command::new(vgmstream_path);
+		command.arg("-p")
+		// -m: print metadata only, don't decode
+		// -I: print requested file info as JSON
+			.arg(src_file);
+
+		// Run the command
+		let output = command.output();
+
+		let output = if let Err(error) = output {
+			return Err(format!("Error running vgmstream\n{}", error))
+		} else {
+			output.unwrap()
+		};
+
+		// Check the error code
+		if let Some(code) = output.status.code() {
+			if code != 0 {
+				let mut error = format!("Attempted running vgmstream, found exit code {}\n", code);
+
+				let stdout = String::from_utf8(output.stdout);
+				let stderr = String::from_utf8(output.stderr);
+
+				if let Ok(out) = stdout {
+					if out.is_empty() {
+						error.push_str("stdout is empty\n")
+					} else {
+						error.push_str(&format!("stdout is:\n{}\n", out))
+					}
+				} else {
+					error.push_str("stdout couldn't be read\n")
+				}
+				if let Ok(err) = stderr {
+					if err.is_empty() {
+						error.push_str("stderr is empty")
+					} else {
+						error.push_str(&format!("stderr is:\n{}", err))
+					}
+				} else {
+					error.push_str("stderr couldn't be read")
+				}
+
+				return Err(error)
+			}
+		}
+
+		Ok(output.stdout)
+	}
+
+	/// Run vgmstream, read metadata of `src_file` and return a [json::JsonValue].
+	fn vgmstream_metadata(src_file: &Path, settings: &crate::settings::Settings) -> Result<json::JsonValue, String> {
+		let vgmstream_path = settings.vgmstream_path();
+		if vgmstream_path.is_empty() {
+			return Err("vgmstream path is empty".to_owned())
+		}
+
+		// Create the command
+		let mut command = Command::new(vgmstream_path);
+		command.arg("-mI")
+		// -m: print metadata only, don't decode
+		// -I: print requested file info as JSON
+			.arg(src_file);
+
+		// Run the command
+		let output = command.output();
+
+		let output = if let Err(error) = output {
+			return Err(format!("Error running vgmstream\n{}", error))
+		} else {
+			output.unwrap()
+		};
+
+		// Check the error code
+		if let Some(code) = output.status.code() {
+			if code != 0 {
+				let mut error = format!("Attempted running vgmstream, found exit code {}\n", code);
+
+				let stdout = String::from_utf8(output.stdout);
+				let stderr = String::from_utf8(output.stderr);
+
+				if let Ok(out) = stdout {
+					if out.is_empty() {
+						error.push_str("stdout is empty\n")
+					} else {
+						error.push_str(&format!("stdout is:\n{}\n", out))
+					}
+				} else {
+					error.push_str("stdout couldn't be read\n")
+				}
+				if let Ok(err) = stderr {
+					if err.is_empty() {
+						error.push_str("stderr is empty")
+					} else {
+						error.push_str(&format!("stderr is:\n{}", err))
+					}
+				} else {
+					error.push_str("stderr couldn't be read")
+				}
+
+				return Err(error)
+			}
+		}
+
+		// Get string output
+		let text_output = match std::str::from_utf8(&output.stdout) {
+			Ok(output) => output,
+			Err(error) => return Err(format!("Error reading vgmstream output\n{}", error))
+		};
+		// Parse output as JSON
+		match json::parse(text_output) {
+			Ok(output) => Ok(output),
+			Err(error) => Err(format!("Error parsing vgmstream output\n{}", error))
 		}
 	}
 }

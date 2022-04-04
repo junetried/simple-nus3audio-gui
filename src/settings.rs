@@ -43,13 +43,22 @@ lazy_static! {
 
 const VGAUDIO_CLI_PATH: &str = "vgaudio_cli_path";
 const VGAUDIO_CLI_PREPATH: &str = "vgaudio_cli_prepath";
+const VGMSTREAM_PATH: &str = "vgmstream_path";
 const FIRST_TIME: &str = "first_time";
+const PREFER_VGMSTREAM_DECODE: &str = "prefer_vgmstream_for_decode";
+
 #[cfg(target_os = "windows")]
 const VGAUDIO_CLI_PATH_DEFAULT: &str = ".\\VGAudioCli.exe";
 #[cfg(not(target_os = "windows"))]
 const VGAUDIO_CLI_PATH_DEFAULT: &str = "./VGAudioCli.exe";
 
+#[cfg(target_os = "windows")]
+const VGMSTREAM_PATH_DEFAULT: &str = ".\\vgmstream-cli.exe";
+#[cfg(not(target_os = "windows"))]
+const VGMSTREAM_PATH_DEFAULT: &str = "./vgmstream-cli";
+
 const FIRST_TIME_DEFAULT: bool = false;
+const PREFER_VGMSTREAM_DECODE_DEFAULT: bool = true;
 
 const CONFIGURE_MESSAGE: &str = "Please set the path to the VGAudioCli executable.";
 #[cfg(not(target_os = "windows"))]
@@ -70,12 +79,15 @@ impl Settings {
 		let map = toml::map::Map::new();
 
 		Self::from_default(map)
-			}
+	}
 
 	/// Create new settings from the map provided, filling in missing values with defaults.
 	pub fn from_default(mut map: toml::map::Map<String, toml::Value>) -> Self {
 		if !map.contains_key(VGAUDIO_CLI_PATH) {
 			map.insert(VGAUDIO_CLI_PATH.to_owned(), toml::Value::String(VGAUDIO_CLI_PATH_DEFAULT.to_owned()));
+		}
+		if !map.contains_key(VGMSTREAM_PATH) {
+			map.insert(VGMSTREAM_PATH.to_owned(), toml::Value::String(VGMSTREAM_PATH_DEFAULT.to_owned()));
 		}
 		if !map.contains_key(VGAUDIO_CLI_PREPATH) {
 			map.insert(VGAUDIO_CLI_PREPATH.to_owned(), toml::Value::String(VGAUDIO_CLI_PREPATH_DEFAULT.to_owned()));
@@ -83,6 +95,11 @@ impl Settings {
 		if !map.contains_key(FIRST_TIME) {
 			map.insert(FIRST_TIME.to_owned(), toml::Value::Boolean(FIRST_TIME_DEFAULT));
 		}
+		if !map.contains_key(PREFER_VGMSTREAM_DECODE) {
+			map.insert(PREFER_VGMSTREAM_DECODE.to_owned(), toml::Value::Boolean(PREFER_VGMSTREAM_DECODE_DEFAULT));
+		}
+
+		Self (map)
 	}
 
 	/// Return a deserialized settings file, or the default.
@@ -105,6 +122,16 @@ impl Settings {
 			value
 		} else {
 			VGAUDIO_CLI_PATH_DEFAULT
+		}
+	}
+
+	/// Return the path to vgmstream's executable.
+	pub fn vgmstream_path(&self) -> &str {
+		let value = self.0.get::<str>(VGMSTREAM_PATH);
+		if let Some(toml::Value::String(value)) = value {
+			value
+		} else {
+			VGMSTREAM_PATH_DEFAULT
 		}
 	}
 
@@ -143,6 +170,17 @@ impl Settings {
 			*value
 		} else {
 			FIRST_TIME_DEFAULT
+		}
+	}
+
+	/// Return the prefer vgmstream for decode boolean.
+	/// Whether or not vgmstream should be preferred over VGAudioCli when vgmstream's path is not empty.
+	pub fn prefer_vgmstream_decode(&self) -> bool {
+		let value = self.0.get::<str>(PREFER_VGMSTREAM_DECODE);
+		if let Some(toml::Value::Boolean(value)) = value {
+			*value
+		} else {
+			PREFER_VGMSTREAM_DECODE_DEFAULT
 		}
 	}
 

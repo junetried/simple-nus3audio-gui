@@ -220,16 +220,6 @@ impl ListItem {
 		self.loop_points_samples = loop_points;
 	}
 
-	/// Return the number of channels in the contained audio.
-	pub fn channels(&self) -> u16 {
-		self.channels
-	}
-
-	/// Return the sample rate of the contained audio.
-	pub fn sample_rate(&self) -> u32 {
-		self.sample_rate
-	}
-
 	/// Attach a new raw value to this item.
 	pub fn set_audio_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {
 		let cursor = Cursor::new(raw);
@@ -314,15 +304,6 @@ impl ListItem {
 				Ok(())
 			},
 			Err(error) => Err(format!("Error reading returned wav\n{}", error))
-		}
-	}
-
-	/// Return the raw audio from this item. Returns an error if it is [None].
-	pub fn get_audio_raw(&mut self) -> Result<Vec<i16>, String> {
-		if let Some(raw) = &self.audio_raw {
-			Ok(raw.clone())
-		} else {
-			Err("Audio of selected item is empty".to_owned())
 		}
 	}
 

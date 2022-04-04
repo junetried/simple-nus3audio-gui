@@ -71,7 +71,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) {
 	loop_to_input.set_tooltip("End of the loop in samples, when it reaches this point it loops back to the beginning of the loop");
 
 	// Set the value of the loop things
-	if let Some((from, to)) = &item.loop_points {
+	if let Some((from, to)) = item.loop_points() {
 		loop_toggle.set(true);
 		loop_from_input.set_value(&from.to_string());
 		loop_to_input.set_value(&to.to_string())
@@ -108,12 +108,12 @@ pub fn configure(item: &mut ListItem, parent: &Window) {
 			match e {
 				PropMessage::ReLay => layout::lay_prop_widgets(&mut window, &mut name_input, &mut idsp_radio, &mut lopus_radio, &mut loop_toggle, &mut loop_from_input, &mut loop_to_input, &mut save_button),
 				PropMessage::ToggleLoop => {
-					if item.loop_points.is_some() {
-						item.loop_points = None;
+					if item.loop_points().is_some() {
+						item.set_loop_points(None);
 						loop_from_input.deactivate();
 						loop_to_input.deactivate()
 					} else {
-						item.loop_points = Some((0, item.length_in_samples));
+						item.set_loop_points(Some((0, item.length_in_samples)));
 						loop_from_input.activate();
 						loop_from_input.set_value("0");
 						loop_to_input.activate();
@@ -142,10 +142,10 @@ pub fn configure(item: &mut ListItem, parent: &Window) {
 	if apply {
 		item.name = name_input.value();
 		item.extension = if idsp_radio.is_toggled() { AudioExtension::Idsp } else { AudioExtension::Lopus };
-		item.loop_points = if loop_toggle.is_checked() {
+		item.set_loop_points(if loop_toggle.is_checked() {
 			Some((loop_from_input.value().parse().unwrap_or(0), loop_to_input.value().parse().unwrap_or(0)))
 		} else {
 			None
-		}
+		})
 	}
 }

@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 nus3audio = "^1.1"
 #ubyte = "0.10"
+kira = "0.6"
 rodio = "0.15"
 serde = "1.0.97"
 toml = "0.5.8"

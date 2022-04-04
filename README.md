@@ -1,5 +1,5 @@
 # simple-nus3audio-gui
-A tool written in Rust using FLTK, rodio and [jam1garner's libnus3audio](https://github.com/jam1garner/libnus3audio).
+A tool written in Rust using [FLTK](https://www.fltk.org/), [Kira](https://github.com/tesselode/kira), [rodio](https://github.com/RustAudio/rodio), and [jam1garner's libnus3audio](https://github.com/jam1garner/libnus3audio).
 
 ## Why?
 I got tired of using the [NUS3Audio Editor](https://gamebanana.com/tools/6927) via WINE. Replacing audio was tedious when I had to start from root for each file thanks to the odd file dialog, and the software overall was far from stable. You could trigger a dotnet exception by pressing Play too fast.

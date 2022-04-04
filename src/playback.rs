@@ -4,28 +4,36 @@ use fltk::{
 	// valuator::HorNiceSlider
 	valuator::HorFillSlider
 };
-use rodio::{
-	Decoder as AudioDecoder,
-	OutputStream,
-	OutputStreamHandle,
-	PlayError,
-	Sink as AudioSink,
-	source::Source as AudioSource,
-	StreamError
+use kira::{
+	manager::{
+		AudioManager,
+		AudioManagerSettings,
+		backend::cpal::{
+			CpalBackend,
+			Error as CpalError
+		}
+	},
+	sound::static_sound::{
+		PlaybackState,
+		StaticSoundData,
+		StaticSoundHandle,
+		StaticSoundSettings
+	},
+	tween::{
+		Easing,
+		Tween
+	}
 };
-use std::{
-	io::Cursor,
-	time::Instant
-};
+use std::io::Cursor;
 
 /// Play button text. FLTK gives us the option to use a nice, fancy icon.
 const PLAY: &str = "@>";
 /// Pause button text.
-// const PAUSE: &str = "@||";
+const PAUSE: &str = "@||";
 /// The time between UI updates to the slider while actively playing audio.
 const UPDATE_FREQUENCY: f64 = 0.1;
 
-/// Struct that keeps the UI play button and controls rodio.
+/// Struct that keeps the UI play button and controls kira.
 pub struct Playback {
 	/// The play widget.
 	play_widget: Button,
@@ -33,34 +41,33 @@ pub struct Playback {
 	slider_widget: HorFillSlider,
 	/// Whether or not we should be playing.
 	playing: bool,
-	/// The instant the button was pressed.
-	start_time: Instant,
-	// Seeking in rodio is not possible. Pausing with no seek doesn't seem very useful.
-	// pause_time: Option<Instant>,
-	/// Stream handle, or the error it gave.
-	stream_handle: Result<(OutputStream, OutputStreamHandle), StreamError>,
-	/// Sink, or the error it gave.
-	sink: Option<Result<AudioSink, PlayError>>,
+	/// Audio manager, or the error it gave.
+	audio_manager: Result<AudioManager, CpalError>,
+	/// Playback handle.
+	playing_handle: Option<StaticSoundHandle>,
+	loop_points_seconds: Option<(f64, f64)>,
 	/// App sender.
 	sender: fltk::app::Sender<crate::Message>
 }
 
 impl Playback {
-	/// Attempt to create the stream handle.
-	fn create_stream_handle() -> Result<(OutputStream, OutputStreamHandle), StreamError> {
-		OutputStream::try_default()
-	}
+	/// Attempt to create the audio manager.
+	fn create_audio_manager() -> Result<AudioManager, CpalError> {
+		let capacities = kira::manager::Capacities {
+			command_capacity: 32,
+			sound_capacity: 8,
+			sub_track_capacity: 8,
+			clock_capacity: 1
+		};
+		let main_track_builder = kira::track::TrackBuilder::default();
+		let backend_settings = ();
 
-	/// Create the sink from the stream handle result.
-	/// 
-	/// Returns [None] if the handle is an error, otherwise tries to create the sink and returns the result in an [Option].
-	fn create_sink(handle: &Result<(OutputStream, OutputStreamHandle), StreamError>) -> Option<Result<AudioSink, PlayError>> {
-		match handle {
-			Ok((_, handle)) => {
-				Some(AudioSink::try_new(handle))
-			},
-			Err(_) => None
-		}
+		let manager_settings = AudioManagerSettings::<CpalBackend> {
+			capacities,
+			main_track_builder,
+			backend_settings
+		};
+		AudioManager::<CpalBackend>::new(manager_settings)
 	}
 
 	/// Create a new instance of Self.
@@ -72,25 +79,23 @@ impl Playback {
 		// let mut slider_widget = HorNiceSlider::default();
 		let mut slider_widget = HorFillSlider::default();
 		slider_widget.set_tooltip("Position of the playing audio");
-		// slider_widget.set_callback(move |c| c.emit(sender, crate::Message::Seek));
-		slider_widget.deactivate();
+		slider_widget.set_callback(move |c| c.emit(sender, crate::Message::Seek));
+		// slider_widget.deactivate();
 		slider_widget.set_selection_color(fltk::enums::Color::Blue);
 		slider_widget.set_minimum(0.0);
 		slider_widget.set_maximum(1.0);
 		slider_widget.set_step(1.0, 1);
 		slider_widget.set_value(0.0);
 
-		let stream_handle = Self::create_stream_handle();
-		let sink = Self::create_sink(&stream_handle);
+		let audio_manager = Self::create_audio_manager();
 
 		Self {
 			play_widget,
 			slider_widget,
 			playing: false,
-			start_time: Instant::now(),
-			// pause_time: None,
-			stream_handle,
-			sink,
+			audio_manager,
+			playing_handle: None,
+			loop_points_seconds: None,
 			sender
 		}
 	}
@@ -99,39 +104,27 @@ impl Playback {
 	/// 
 	/// If the stream handle isn't set already, tries to create it again.
 	/// Otherwise, this does nothing.
-	pub fn get_handle(&mut self) {
-		if self.stream_handle.is_ok() { return }
+	pub fn get_manager(&mut self) {
+		if self.audio_manager.is_ok() { return }
 		
-		self.stream_handle = Self::create_stream_handle()
+		self.audio_manager = Self::create_audio_manager()
 	}
-
-	/// Try to get a sink.
-	/// 
-	/// If the current sink isn't set already, tries to create it again.
-	/// Otherwise, this does nothing.
-	pub fn get_sink(&mut self) {
-		self.get_handle();
-
-		if self.sink.is_some() && self.sink.as_ref().unwrap().is_ok() { return }
-
-		self.sink = Self::create_sink(&self.stream_handle)
-	}
-
-	// pub fn get_time(&self) -> Instant {
-	// 	if let Some(time) = self.pause_time {
-	// 		self.start_time - time.elapsed()
-	// 	} else {
-	// 		self.start_time
-	// 	}
-	// }
 
 	/// Updates the value of the slider widget to match the sink position.
 	pub fn on_update(&mut self) {
 		if self.playing {
-			if let Some(Ok(sink)) = &self.sink {
-				self.slider_widget.set_value(self.start_time.elapsed().as_secs_f64());
+			if let Some(handle) = &mut self.playing_handle {
+				// if let Some((begin, end)) = self.loop_points_seconds {
+				// 	let pos = handle.position();
+				// 	if pos > end || float_cmp::approx_eq!(f64, pos, end) {
+				// 		println!("looping!");
+				// 		let _ = handle.seek_to(begin);
+				// 		let _ = handle.resume(Self::no_tween());
+				// 	}
+				// }
+				self.slider_widget.set_value(handle.position());
 				// No need to run more updates if it's paused
-				if sink.is_paused() || sink.empty() {
+				if handle.state() != PlaybackState::Playing {
 					self.playing = false;
 					self.play_widget.set_label(PLAY)
 				} else {
@@ -139,22 +132,25 @@ impl Playback {
 				}
 				self.slider_widget.redraw()
 			} else {
-				self.playing = false
+				self.playing = false;
+				self.play_widget.set_label(PLAY)
 			}
 		}
 		// Do nothing if we aren't playing anything
 	}
 
-	// pub fn on_seek(&mut self) {
-	// 	if self.playing {
-	// 		if let Some(sink) = &mut self.sink {
-	// 			if let Ok(sink) = sink {
-	// 				println!("setting pos");
-	// 				sink.set_pos(self.slider_widget.value() as f32)
-	// 			}
-	// 		}
-	// 	}
-	// }
+	pub fn on_seek(&mut self) {
+		if self.playing {
+			self.seek(self.slider_widget.value())
+		}
+	}
+
+	pub fn seek(&mut self, to: f64) {
+		if let Some(handle) = &mut self.playing_handle {
+			let _ = handle.seek_to(to);
+			let _ = handle.resume(Self::no_tween());
+		}
+	}
 
 	/// Queue the slider update.
 	fn queue_update(sender: fltk::app::Sender<crate::Message>) {
@@ -163,22 +159,21 @@ impl Playback {
 
 	/// Try to play the currently selected sound.
 	pub fn on_press(&mut self, file_list: &mut crate::list::List) -> Result<(), String> {
-		// Stop any playback already happening
-		self.stop_sink();
+		// Make sure we have the audio manager
+		self.get_manager();
 
-		// Make sure we should have a sink by this point
-		self.get_sink();
-
-		if let Some(sink) = &mut self.sink {
-			match sink {
-				Ok(sink) => {
-					// Stream is fine
-					// if !sink.empty() {
-					if false {
-						if sink.is_paused() {
-							// self.play_widget.set_label(PAUSE);
+		let result = match &mut self.audio_manager {
+			Ok(manager) => {
+				// Stream is fine
+				match &mut self.playing_handle {
+					Some(handle) if handle.state() != PlaybackState::Stopped => {
+						// Already have a playback handle
+						if handle.state() == PlaybackState::Paused {
+							self.play_widget.set_label(PAUSE);
 							self.playing = true;
-							sink.play();
+							if let Err(error) = handle.resume(Tween::default()) {
+								return Err(error.to_string())
+							}
 							// if let Some(time) = self.pause_time.take() {
 							// 	self.start_time += time.elapsed()
 							// }
@@ -186,74 +181,81 @@ impl Playback {
 							Ok(())
 						} else {
 							self.play_widget.set_label(PLAY);
-							sink.pause();
+							if let Err(error) = handle.pause(Tween::default()) {
+								return Err(error.to_string())
+							}
 							// self.pause_time = Some(Instant::now());
 							Ok(())
 						}
-					} else {
+					},
+					_ => {
+						// No handle
 						// Check if anything is selected
 						if let Some((index, _)) = file_list.selected() {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
-							let raw = list_item.audio_raw.clone();
-							match raw {
-								Some(data) => {
-									// Create a cursor for the buffer
-									let buffer = Cursor::new(data);
-									// Create the source
-									let source = AudioDecoder::new(buffer);
-									
-									match source {
-										Ok(s) => {
-											if let Some(duration) = s.total_duration() {
-												self.slider_widget.set_bounds(0.0, duration.as_secs_f64());
-												self.slider_widget.set_step((duration.as_secs_f64() / 20.0).min(0.2), 2)
-											}
-											
-											// self.play_widget.set_label(PAUSE);
-											sink.append(s);
-											self.start_time = Instant::now();
-											self.playing = true;
-											self.sender.send(crate::Message::Update);
-											sink.play();
-											Ok(())
-										},
-										Err(error) => {
-											Err(format!("Could not play audio:\n{}", error))
-										}
-									}
+							self.loop_points_seconds = *list_item.loop_points_seconds();
+
+							// Create the sound settings
+							let mut settings = StaticSoundSettings::default();
+							if let Some((begin, _)) = self.loop_points_seconds {
+								settings.loop_behavior = Some(kira::LoopBehavior { start_position: begin });
+							}
+
+							// Create the sound data
+							let sound_data = StaticSoundData::from_cursor(Cursor::new(list_item.get_audio_wav(list_item.loop_end())?), settings);
+
+							match sound_data {
+								Ok(s) => {
+									let duration = s.duration();
+									self.slider_widget.set_bounds(0.0, duration.as_secs_f64());
+									self.slider_widget.set_step((duration.as_secs_f64() / 20.0).min(0.2), 2);
+
+									self.play_widget.set_label(PAUSE);
+									self.playing = true;
+									self.sender.send(crate::Message::Update);
+									match manager.play(s) {
+										Ok(handle) => self.playing_handle = Some(handle),
+										Err(error) => return Err(error.to_string())
+									};
+									Ok(())
 								},
-								None => {
-									Err("Audio of selected item is empty.".to_owned())
+								Err(error) => {
+									Err(format!("Could not play audio:\n{}", error))
 								}
 							}
 						} else {
 							Err("Nothing is selected.".to_owned())
 						}
 					}
-				},
-				Err(error) => Err(error.to_string())
-			}
-		} else {
-			// Output handle is fine but sink has no result
-			// This shouldn't be reachable, unless I did something wrong
-			unreachable!()
+				}
+			},
+			Err(error) => Err(error.to_string())
+		};
+		if let Some((begin, end)) = self.loop_points_seconds {
+			println!("from {} to {}", begin, end)
 		}
+		println!("{}", self.playing_handle.is_some());
+		result
 	}
 
 	/// Stop the current sink.
 	pub fn stop_sink(&mut self) {
-		self.slider_widget.set_value(0.0);
-		if let Some(Ok(sink)) = &mut self.sink {
-			sink.stop();
-			self.playing = false;
-			self.play_widget.set_label(PLAY);
-			// https://github.com/RustAudio/rodio/issues/315
-			self.sink = None
+		if let Some(handle) = &mut self.playing_handle {
+			let _ = handle.stop(Self::no_tween());
 		}
+		self.play_widget.set_label(PLAY);
+		self.slider_widget.set_value(0.0);
+		self.playing = false;
+		self.loop_points_seconds = None;
+		self.playing_handle = None
 	}
 
 	/// Returns the [&mut Browser] widget of this List.
 	pub fn get_widgets_mut(&mut self) -> (&mut Button, &mut HorFillSlider) {
 		(&mut self.play_widget, &mut self.slider_widget)
+	}
+
+	pub fn no_tween() -> Tween {
+		Tween { start_time: kira::StartTime::Immediate, duration: std::time::Duration::from_secs(0), easing: Easing::Linear }
 	}
 }

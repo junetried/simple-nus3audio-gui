@@ -84,6 +84,8 @@ impl List {
 	}
 
 	/// Remove an item from this list by index.
+	/// 
+	/// Marks this list as being modified.
 	pub fn remove(&mut self, index: usize) {
 		self.items.remove(index);
 		self.widget.remove(index as i32 + 1);
@@ -91,6 +93,8 @@ impl List {
 	}
 
 	/// Clear the items in this list.
+	/// 
+	/// Marks this list as being unmodified.
 	pub fn clear(&mut self) {
 		self.items.clear();
 		self.widget.clear();
@@ -98,6 +102,8 @@ impl List {
 	}
 
 	/// Replace a sound at `index` via a file dialog.
+	/// 
+	/// If it doesn't fail, marks this list as being modified.
 	pub fn replace(&mut self, index: usize, settings: &crate::Settings) -> Result<(), String> {
 		let list_item = match self.items.get_mut(index) {
 			Some(item) => item,
@@ -144,6 +150,8 @@ impl List {
 	}
 
 	/// Save this nus3audio to the file at `self.path`.
+	/// 
+	/// Marks this list as being unmodified.
 	pub fn save_nus3audio(&mut self, path: Option<&Path>, settings: &crate::settings::Settings) -> Result<(), String> {
 		let path = if let Some(path) = path { path } else { self.path.as_ref().expect("No path has been set to save.") };
 		let name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -198,6 +206,8 @@ impl List {
 	}
 
 	/// Adds an item to the list.
+	/// 
+	/// Marks this list as being modified.
 	pub fn add_item(&mut self, item: ListItem, name: &str) {
 		self.items.push(item);
 		self.widget.add(name);

@@ -454,15 +454,15 @@ impl ListItem {
 	fn decode(&self, src_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
 		if settings.prefer_vgmstream_decode() {
 			if !settings.vgmstream_path().is_empty() {
-				Self::vgmstream_decode(&src_file, settings)
+				Self::vgmstream_decode(src_file, settings)
 			} else {
-				self.vgaudio_cli_decode(&src_file, &src_file.with_extension("wav"), settings)
+				self.vgaudio_cli_decode(src_file, &src_file.with_extension("wav"), settings)
 			}
 		} else {
 			if !settings.vgaudio_cli_path().is_empty() {
-				self.vgaudio_cli_decode(&src_file, &src_file.with_extension("wav"), settings)
+				self.vgaudio_cli_decode(src_file, &src_file.with_extension("wav"), settings)
 			} else {
-				Self::vgmstream_decode(&src_file, settings)
+				Self::vgmstream_decode(src_file, settings)
 			}
 		}
 	}

@@ -48,14 +48,14 @@ const FIRST_TIME: &str = "first_time";
 const PREFER_VGMSTREAM_DECODE: &str = "prefer_vgmstream_for_decode";
 
 #[cfg(target_os = "windows")]
-const VGAUDIO_CLI_PATH_DEFAULT: &str = ".\\VGAudioCli.exe";
+const VGAUDIO_CLI_PATH_DEFAULT: &str = ".\\VGAudioCli\\VGAudioCli.exe";
 #[cfg(not(target_os = "windows"))]
-const VGAUDIO_CLI_PATH_DEFAULT: &str = "./VGAudioCli.exe";
+const VGAUDIO_CLI_PATH_DEFAULT: &str = "./VGAudioCli/VGAudioCli.exe";
 
 #[cfg(target_os = "windows")]
-const VGMSTREAM_PATH_DEFAULT: &str = ".\\vgmstream-cli.exe";
+const VGMSTREAM_PATH_DEFAULT: &str = ".\\vgmstream\\test.exe";
 #[cfg(not(target_os = "windows"))]
-const VGMSTREAM_PATH_DEFAULT: &str = "./vgmstream-cli";
+const VGMSTREAM_PATH_DEFAULT: &str = "./vgmstream/vgmstream-cli";
 
 const FIRST_TIME_DEFAULT: bool = false;
 const PREFER_VGMSTREAM_DECODE_DEFAULT: bool = true;

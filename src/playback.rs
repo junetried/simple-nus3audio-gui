@@ -45,7 +45,10 @@ pub struct Playback {
 	audio_manager: Result<AudioManager, CpalError>,
 	/// Playback handle.
 	playing_handle: Option<StaticSoundHandle>,
+	/// The loop points of the playing audio in seconds.
 	loop_points_seconds: Option<(f64, f64)>,
+	/// The index of the currently playing audio in the list it came from.
+	current_playing_index: Option<usize>,
 	/// App sender.
 	sender: fltk::app::Sender<crate::Message>
 }
@@ -96,6 +99,7 @@ impl Playback {
 			audio_manager,
 			playing_handle: None,
 			loop_points_seconds: None,
+			current_playing_index: None,
 			sender
 		}
 	}
@@ -154,11 +158,18 @@ impl Playback {
 		// Make sure we have the audio manager
 		self.get_manager();
 
-		let result = match &mut self.audio_manager {
+		// Get the currently selected audio
+		let selected = file_list.selected().map(|(index, _)| index);
+
+		match &mut self.audio_manager {
 			Ok(manager) => {
 				// Stream is fine
 				match &mut self.playing_handle {
-					Some(handle) if handle.state() != PlaybackState::Stopped => {
+					// Matches if:
+					//  There is a handle
+					//  The handle is not in a stopped state
+					//  There is no selected audio OR the selected audio was already playing
+					Some(handle) if handle.state() != PlaybackState::Stopped && ( selected.is_none() || selected == self.current_playing_index ) => {
 						// Already have a playback handle
 						if handle.state() == PlaybackState::Paused {
 							self.play_widget.set_label(PAUSE);
@@ -166,9 +177,6 @@ impl Playback {
 							if let Err(error) = handle.resume(Tween::default()) {
 								return Err(error.to_string())
 							}
-							// if let Some(time) = self.pause_time.take() {
-							// 	self.start_time += time.elapsed()
-							// }
 							Self::queue_update(self.sender);
 							Ok(())
 						} else {
@@ -176,14 +184,19 @@ impl Playback {
 							if let Err(error) = handle.pause(Tween::default()) {
 								return Err(error.to_string())
 							}
-							// self.pause_time = Some(Instant::now());
 							Ok(())
 						}
 					},
 					_ => {
-						// No handle
+						// Playing new audio
+
+						// If there really is a handle, stop the audio now
+						if let Some(handle) = &mut self.playing_handle {
+							let _ = handle.stop(Self::no_tween());
+						}
+
 						// Check if anything is selected
-						if let Some((index, _)) = file_list.selected() {
+						if let Some(index) = selected {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 							self.loop_points_seconds = *list_item.loop_points_seconds();
 
@@ -206,7 +219,10 @@ impl Playback {
 									self.playing = true;
 									self.sender.send(crate::Message::Update);
 									match manager.play(s) {
-										Ok(handle) => self.playing_handle = Some(handle),
+										Ok(handle) => {
+											self.playing_handle = Some(handle);
+											self.current_playing_index = selected
+										},
 										Err(error) => return Err(error.to_string())
 									};
 									Ok(())
@@ -222,8 +238,7 @@ impl Playback {
 				}
 			},
 			Err(error) => Err(error.to_string())
-		};
-		result
+		}
 	}
 
 	/// Stop the current sink.

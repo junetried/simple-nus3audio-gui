@@ -60,7 +60,8 @@ const VGMSTREAM_PATH_DEFAULT: &str = "./vgmstream-cli";
 const FIRST_TIME_DEFAULT: bool = false;
 const PREFER_VGMSTREAM_DECODE_DEFAULT: bool = true;
 
-const CONFIGURE_MESSAGE: &str = "Please set the path to the VGAudioCli executable.";
+const CONFIGURE_VGAUDIO_CLI_MESSAGE: &str = "Please set the path to the VGAudioCli executable.\nThis is required for encoding audio, i.e. saving any nus3audio file.";
+const CONFIGURE_VGMSTREAM_MESSAGE: &str = "Please set the path to the vgmstream executable.\nThis is required for reading loop metadata from audio, and can decode audio.";
 #[cfg(not(target_os = "windows"))]
 const CONFIGURE_RUNTIME_MESSAGE: &str = "Please set the path to the executable used to run .NET applications.
 This executable will be given the path to the VGAudioCli executable, immediately followed by arguments passed to it.
@@ -215,7 +216,7 @@ Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss",
 
 			if let Some(1) = response {
 				let _ = open::that("https://ci.appveyor.com/project/Thealexbarney/VGAudio/build/artifacts");
-				sender.send(crate::Message::ConfigurePath)
+				sender.send(crate::Message::ConfigureVGAudioCliPath)
 			}
 
 			self.set_first_time(false)
@@ -224,10 +225,7 @@ Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss",
 
 	/// Open an input dialog that allows changing the VGAudioCli path.
 	pub fn configure_vgaudio_cli_path(&mut self, window: &Window) {
-		message_title("VGAudioCli Path");
-		if let Some(new_path) = input(window, CONFIGURE_MESSAGE, self.vgaudio_cli_path()) {
-			self.0.insert(VGAUDIO_CLI_PATH.to_owned(), toml::Value::String(new_path));
-		}
+		self.configure_value(VGAUDIO_CLI_PATH, "VGAudioCli Path", CONFIGURE_VGAUDIO_CLI_MESSAGE, window)
 	}
 
 	#[cfg(not(target_os = "windows"))]
@@ -236,9 +234,34 @@ Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss",
 	/// Though the .NET runtime is not configurable in Windows,
 	/// this setting is still used there (although it defaults to an empty string).
 	pub fn configure_vgaudio_cli_prepath(&mut self, window: &Window) {
-		message_title(".NET Runtime Path");
-		if let Some(new_path) = input(window, CONFIGURE_RUNTIME_MESSAGE, self.vgaudio_cli_prepath()) {
-			self.0.insert(VGAUDIO_CLI_PREPATH.to_owned(), toml::Value::String(new_path));
+		self.configure_value(VGAUDIO_CLI_PREPATH, ".NET Runtime Path", CONFIGURE_RUNTIME_MESSAGE, window)
+	}
+
+	/// Open an input dialog that allows changing the vgmstream path.
+	pub fn configure_vgmstream_path(&mut self, window: &Window) {
+		self.configure_value(VGMSTREAM_PATH, "vgmstream Path", CONFIGURE_VGMSTREAM_MESSAGE, window)
+	}
+
+	/// Configure the value `key` with a dialog window.
+	pub fn configure_value(&mut self, key: &str, title: &str, message: &str, window: &Window) {
+		message_title(title);
+		let default: &str;
+		match self.0.get(key) {
+			Some(toml::Value::String(existing)) => {
+				default = existing
+			},
+			Some(_) => {
+				message_title("Error");
+				crate::alert(window, &format!("The property {} is not a string.", key));
+				return ()
+			},
+			None => {
+				default = ""
+			}
+		}
+
+		if let Some(new_value) = input(window, message, default) {
+			self.0.insert(key.to_owned(), toml::Value::String(new_value));
 		}
 	}
 

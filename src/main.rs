@@ -63,7 +63,7 @@ pub enum Message {
 	/// Replace a single sound.
 	Replace,
 	/// Configure the VGAudioCli path.
-	ConfigurePath,
+	ConfigureVGAudioCliPath,
 	#[cfg(not(target_os = "windows"))]
 	/// Configure the .NET runtime path.
 	/// 
@@ -72,6 +72,8 @@ pub enum Message {
 	/// Though the .NET runtime is not configurable here in Windows,
 	/// the setting is still used there (although it defaults to an empty string).
 	ConfigureRuntimePath,
+	/// Configure the vgmstream path.
+	ConfigureVgmstreamPath,
 	/// Show the welcome message again.
 	WelcomeGreeting,
 	/// Open the online manual.
@@ -174,7 +176,7 @@ fn main() {
 		Shortcut::empty(),
 		MenuFlag::Normal,
 		s,
-		Message::ConfigurePath,
+		Message::ConfigureVGAudioCliPath,
 	);
 	#[cfg(not(target_os = "windows"))]
 	menu.add_emit(
@@ -183,6 +185,13 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::ConfigureRuntimePath,
+	);
+	menu.add_emit(
+		"&Edit/&Configure vgmstream path...\t",
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::ConfigureVgmstreamPath,
 	);
 	menu.add_emit(
 		"&Playback/&Play\t",
@@ -521,9 +530,10 @@ fn main() {
 				Message::Stop => playback.stop_sink(),
 				Message::Update => playback.on_update(),
 				Message::Seek => playback.on_seek(),
-				Message::ConfigurePath => settings.configure_vgaudio_cli_path(&window),
+				Message::ConfigureVGAudioCliPath => settings.configure_vgaudio_cli_path(&window),
 				#[cfg(not(target_os = "windows"))]
 				Message::ConfigureRuntimePath => settings.configure_vgaudio_cli_prepath(&window),
+				Message::ConfigureVgmstreamPath => settings.configure_vgmstream_path(&window),
 				Message::WelcomeGreeting => {
 					settings.set_first_time(true);
 					settings.first_time_greeting(&window, s)

@@ -114,14 +114,6 @@ impl Playback {
 	pub fn on_update(&mut self) {
 		if self.playing {
 			if let Some(handle) = &mut self.playing_handle {
-				// if let Some((begin, end)) = self.loop_points_seconds {
-				// 	let pos = handle.position();
-				// 	if pos > end || float_cmp::approx_eq!(f64, pos, end) {
-				// 		println!("looping!");
-				// 		let _ = handle.seek_to(begin);
-				// 		let _ = handle.resume(Self::no_tween());
-				// 	}
-				// }
 				self.slider_widget.set_value(handle.position());
 				// No need to run more updates if it's paused
 				if handle.state() != PlaybackState::Playing {
@@ -231,10 +223,6 @@ impl Playback {
 			},
 			Err(error) => Err(error.to_string())
 		};
-		if let Some((begin, end)) = self.loop_points_seconds {
-			println!("from {} to {}", begin, end)
-		}
-		println!("{}", self.playing_handle.is_some());
 		result
 	}
 

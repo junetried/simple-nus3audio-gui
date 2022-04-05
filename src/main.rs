@@ -428,7 +428,7 @@ fn main() {
 
 						if !skipped.is_empty() {
 							fltk::dialog::message_title("Warning");
-							alert(&window, &format!("The following items have no audio and were skipped:\n{}", skipped))
+							alert(&window, &format!("The following items were skipped:\n{}", skipped))
 						}
 
 						window.set_cursor(Cursor::Default)

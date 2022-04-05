@@ -530,17 +530,26 @@ fn main() {
 				},
 				Message::Manual => { let _ = open::that("https://github.com/EthanWeegee/simple-nus3audio-gui/wiki/Usage-Manual"); },
 				Message::Quit(code) => {
-					if file_list.modified {
+					// True if we should quit
+					let response = if file_list.modified {
 						fltk::dialog::message_title("Warning");
 						let response = layout::choice2(&window, "You have currently unsaved changes.\nWould you still like to quit?", "Quit", "Go back", "");
 
 						if let Some(0) = response {
-							settings.save();
-							Settings::reset_cache().expect("Failed to reset the cache directory");
-							fltk::app::quit();
-							std::process::exit(code)
+							// Selected "Quit"
+							true
+						} else {
+							// Selected "Go Back"
+							false
 						}
 					} else {
+						// Nothing unsaved
+						true
+					};
+
+					if response {
+						settings.save();
+						Settings::reset_cache().expect("Failed to reset the cache directory");
 						fltk::app::quit();
 						std::process::exit(code)
 					}

@@ -128,7 +128,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 						continue
 					}
 					// End can't be before beginning
-					if loop_from_input.value().parse::<usize>().unwrap_or(0) >= loop_to_input.value().parse().unwrap_or(0) {
+					if loop_from_input.value().parse::<usize>().unwrap_or(0) >= loop_to_input.value().parse().unwrap_or(1) {
 						alert(&window, "Loop beginning must be placed before loop end.");
 						continue
 					}

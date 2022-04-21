@@ -110,11 +110,9 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 				PropMessage::ReLay => layout::lay_prop_widgets(&mut window, &mut name_input, &mut idsp_radio, &mut lopus_radio, &mut loop_toggle, &mut loop_from_input, &mut loop_to_input, &mut save_button),
 				PropMessage::ToggleLoop => {
 					if item.loop_points().is_some() {
-						item.set_loop_points(None);
 						loop_from_input.deactivate();
 						loop_to_input.deactivate()
 					} else {
-						item.set_loop_points(Some((0, item.length_in_samples)));
 						loop_from_input.activate();
 						loop_from_input.set_value("0");
 						loop_to_input.activate();

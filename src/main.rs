@@ -333,16 +333,19 @@ fn main() {
 
 							let extension = list::extension_of_encoded(&file.data);
 
+							// Set the item extension
+							if let Ok(extension) = extension {
+								item.extension = extension
+							}
+
 							if let Err(error) = item.from_encoded(&file_list.name, file.data, &settings) {
 								fltk::dialog::message_title("Error");
 								window.set_cursor(Cursor::Default);
 								alert(&window, &format!("Could not decode {}:\n{}", item_name, error));
 							};
 
-							if let Ok(extension) = extension {
-								item_name.push_str(&format!(".{}", extension));
-								item.extension = extension
-							}
+							// Set the item extension in the name
+							item_name.push_str(&format!(".{}", item.extension));
 
 							file_list.add_item(item, &item_name);
 						};
@@ -355,11 +358,16 @@ fn main() {
 					if let Some((index, sound_name)) = file_list.selected() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 
+						let (filter, default) = match list_item.extension {
+							list::AudioExtension::Bin => ("*", "bin"),
+							_ => ("*.wav\n*.idsp\n*.lopus", "wav")
+						};
+
 						// Make the default file name the sound's name, with ".wav" as the extension
-						let default = std::path::PathBuf::from(&sound_name).with_extension("wav");
+						let default = std::path::PathBuf::from(&sound_name).with_extension(default);
 
 						let mut save_dialog = NativeFileChooser::new(FileDialogType::BrowseSaveFile);
-						save_dialog.set_filter("*.wav\n*.idsp\n*.lopus");
+						save_dialog.set_filter(filter);
 
 						// Set the default file name to save
 						if let Some(filename) = default.to_str() {
@@ -368,21 +376,28 @@ fn main() {
 
 						save_dialog.show();
 
-						let extension = if let Some(extension) = save_dialog.filename().extension() {
-							if extension == "idsp" {"idsp"}
-							else if extension == "lopus" {"lopus"}
-							else {"wav"}
-						} else {"wav"};
+						let target_file = save_dialog.filename();
+						let extension = match target_file.extension() {
+							Some(extension) => {
+								match extension.to_str() {
+									Some(extension) => {
+										extension
+									},
+									_ => "wav"
+								}
+							},
+							_ => "wav"
+						};
 
 						if !save_dialog.filename().to_string_lossy().is_empty() {
 							window.set_cursor(Cursor::Wait);
 
-							let target_file = save_dialog.filename().with_extension(extension);
+							let target_file = target_file.with_extension(extension);
 
-							let raw = if extension == "lopus" || extension == "idsp" {
-								list_item.get_nus3_encoded_raw(&file_list.name, &settings)
-							} else {
+							let raw = if extension == "wav" {
 								list_item.get_audio_wav(None)
+							} else {
+								list_item.get_nus3_encoded_raw(&file_list.name, extension, &settings)
 							};
 
 							if let Err(error) = raw {

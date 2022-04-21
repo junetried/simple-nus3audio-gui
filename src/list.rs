@@ -39,7 +39,8 @@ pub fn extension_of_encoded(encoded: &[u8]) -> Result<AudioExtension, String> {
 #[derive(Clone, PartialEq, Eq)]
 pub enum AudioExtension {
 	Idsp,
-	Lopus
+	Lopus,
+	Bin
 }
 
 impl std::fmt::Display for AudioExtension {
@@ -47,6 +48,7 @@ impl std::fmt::Display for AudioExtension {
 		match self {
 			AudioExtension::Idsp => write!(f, "idsp"),
 			AudioExtension::Lopus => write!(f, "lopus"),
+			AudioExtension::Bin => write!(f, "bin")
 		}
 	}
 }
@@ -111,7 +113,7 @@ impl List {
 		};
 
 		let mut open_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
-		open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp,lopus}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp\n*.lopus");
+		open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp,lopus}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp\n*.lopus\n*");
 		// Set the default path to the last path used
 		if let Some(path) = &self.browser_path {
 			let _ = open_dialog.set_directory(path);
@@ -137,7 +139,7 @@ impl List {
 			} else { list_item.set_audio_raw(raw) };
 
 			if let Err(error) = result {
-				return Err(format!("Could not decode file:\n{}", error))
+				return Err(format!("Could not decode file as audio:\n{}", error))
 			}
 
 			list_item.set_loop_points(ListItem::loop_points_of(&open_dialog.filename(), settings));
@@ -158,7 +160,7 @@ impl List {
 		let mut nus3audio = Nus3audioFile::new();
 
 		for (index, list_item) in self.items.iter_mut().enumerate() {
-			let data = list_item.get_nus3_encoded_raw(&name, settings).unwrap_or_else(|_| Vec::new());
+			let data = list_item.get_nus3_encoded_raw(&name, &list_item.extension.to_string(), settings).unwrap_or_else(|_| Vec::new());
 			nus3audio.files.push(
 				nus3audio::AudioFile {
 					id: index as u32,
@@ -215,6 +217,13 @@ impl List {
 	}
 }
 
+pub enum RawItem {
+	// Any audio.
+	Audio(Vec<i16>),
+	// Anything that can't be decoded as audio.
+	Bytes(Vec<u8>)
+}
+
 /// An item in a [List].
 pub struct ListItem {
 	/// The name of this audio.
@@ -222,7 +231,7 @@ pub struct ListItem {
 	/// The extension of the audio in this nus3audio file.
 	pub extension: AudioExtension,
 	/// Raw audio, in wav format.
-	pub audio_raw: Option<Vec<i16>>,
+	pub audio_raw: Option<RawItem>,
 	/// Loop points of this sound in samples.
 	loop_points_samples: Option<(usize, usize)>,
 	/// Loop points of this sound in seconds.
@@ -280,6 +289,9 @@ impl ListItem {
 
 	/// Attach a new raw value to this item.
 	pub fn set_audio_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {
+		// Set the raw value to this file's bytes before attempting to decode it
+		self.audio_raw = Some(RawItem::Bytes(raw.clone()));
+
 		let cursor = Cursor::new(raw);
 
 		// It would be nice to use Kira for this,
@@ -292,7 +304,12 @@ impl ListItem {
 		// https://github.com/pdeljanov/Symphonia/blob/master/symphonia/examples/getting-started.rs#L53
 		let decoder = rodio::Decoder::new(cursor);
 		if let Err(error) = decoder {
-			return Err(error.to_string())
+			// This can't be decoded
+			eprintln!("Error decoding file: {}", error);
+			self.set_loop_points(None);
+			self.extension = AudioExtension::Bin;
+			return Ok(())
+			
 		};
 		let decoder = decoder.unwrap();
 
@@ -329,7 +346,7 @@ impl ListItem {
 		self.sample_rate = sample_rate;
 		self.channels = channel_count;
 
-		self.audio_raw = Some(decoded);
+		self.audio_raw = Some(RawItem::Audio(decoded));
 		self.set_loop_points(None);
 		Ok(())
 	}
@@ -344,32 +361,42 @@ impl ListItem {
 			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
 		};
 
-		if let Err(error) = fs::write(&src_file, encoded) {
+		if let Err(error) = fs::write(&src_file, &encoded) {
 			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
 		};
 
-		// This should be in wav format now
-		let raw = self.decode(&src_file, settings)?;
+		match self.decode(&src_file, settings) {
+			Ok(raw) => {
+				// This should be in wav format now
+				let loop_points = Self::loop_points_of(&src_file, settings);
 
-		let loop_points = Self::loop_points_of(&src_file, settings);
+				let wav_result = wav::read(&mut Cursor::new(&raw));
 
-		let wav_result = wav::read(&mut Cursor::new(&raw));
+				// Check that the wav could be read
+				match wav_result {
+					Ok((header, bitdepth)) => {
+						let raw = match bitdepth.try_into_sixteen() {
+							Ok(raw) => raw,
+							Err(bitdepth) => return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
+						};
+						self.audio_raw = Some(RawItem::Audio(raw));
+						self.set_loop_points(loop_points);
+						self.channels = header.channel_count;
+						self.sample_rate = header.sampling_rate;
 
-		// Check that the wav could be read
-		match wav_result {
-			Ok((header, bitdepth)) => {
-				let raw = match bitdepth.try_into_sixteen() {
-					Ok(raw) => raw,
-					Err(bitdepth) => return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
-				};
-				self.audio_raw = Some(raw);
-				self.set_loop_points(loop_points);
-				self.channels = header.channel_count;
-				self.sample_rate = header.sampling_rate;
-
-				Ok(())
+						Ok(())
+					},
+					Err(error) => Err(format!("Error reading returned wav\n{}", error))
+				}
 			},
-			Err(error) => Err(format!("Error reading returned wav\n{}", error))
+			Err(error) => {
+				// Could not be decoded, assume this is binary data
+				eprintln!("{}", error);
+				self.audio_raw = Some(RawItem::Bytes(encoded));
+				self.extension = AudioExtension::Bin;
+				self.set_loop_points(None);
+				Ok(())
+			}
 		}
 	}
 
@@ -378,50 +405,66 @@ impl ListItem {
 	/// Optionally take the length in samples that should be used.
 	pub fn get_audio_wav(&self, end: Option<usize>) -> Result<Vec<u8>, String> {
 		if let Some(raw) = &self.audio_raw {
-			// Make the header
-			let header = wav::Header::new(wav::WAV_FORMAT_PCM, self.channels, self.sample_rate, 16);
-			// Create the empty vec
-			let mut wav_file: Vec<u8> = Vec::new();
-			// And the cursor to write to it
-			let mut wav_cursor = Cursor::new(&mut wav_file);
-			// Get the raw slice if there is a specific sample limit
-			let raw = &raw[0..if let Some(end) = end {
-				let sample_length = end * self.channels as usize;
-				println!("raw.len() = {}, sample_length = {}", raw.len(), sample_length);
-				if raw.len() < sample_length { raw.len() } else { sample_length }
-			} else {
-				raw.len()
-			}];
-			// Finally, write the wav file
-			// I don't honestly know when this can fail...
-			if let Err(error) = wav::write(header, &wav::BitDepth::Sixteen(raw.to_vec()), &mut wav_cursor) { return Err(error.to_string())};
+			match raw {
+				RawItem::Audio(raw) => {
+					// Make the header
+					let header = wav::Header::new(wav::WAV_FORMAT_PCM, self.channels, self.sample_rate, 16);
+					// Create the empty vec
+					let mut wav_file: Vec<u8> = Vec::new();
+					// And the cursor to write to it
+					let mut wav_cursor = Cursor::new(&mut wav_file);
+					// Get the raw slice if there is a specific sample limit
+					let raw = &raw[0..if let Some(end) = end {
+						let sample_length = end * self.channels as usize;
+						if raw.len() < sample_length { raw.len() } else { sample_length }
+					} else {
+						raw.len()
+					}];
+					// Finally, write the wav file
+					// I don't honestly know when this can fail...
+					if let Err(error) = wav::write(header, &wav::BitDepth::Sixteen(raw.to_vec()), &mut wav_cursor) { return Err(error.to_string())};
 
-			Ok(wav_file)
+					Ok(wav_file)
+				},
+				RawItem::Bytes(_) => Err("Selected item could not be decoded".to_owned())
+			}
 		} else {
 			Err("Audio of selected item is empty".to_owned())
 		}
 	}
 
 	/// Return the nus3audio-encoded sound from this item. Converts the raw audio.
-	pub fn get_nus3_encoded_raw(&mut self, nus3audio_name: &str, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
+	pub fn get_nus3_encoded_raw(&mut self, nus3audio_name: &str, extension: &str, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
 		if self.audio_raw.is_none() { return Err("Audio of selected item is empty".to_owned()) }
 
-		// Need to convert the wav
-		let target_dir = CACHEDIR.join(nus3audio_name);
-		let dest_file = target_dir.join(&self.name).with_extension(self.extension.to_string());
-		let src_file = dest_file.with_extension("wav");
+		match &self.audio_raw {
+			Some(RawItem::Bytes(bytes)) => {
+				return Ok(bytes.clone())
+			},
+			_ => {
+				// Need to convert the wav
+				let target_dir = CACHEDIR.join(nus3audio_name);
+				let dest_file = target_dir.join(&self.name).with_extension(extension);
+				let src_file = dest_file.with_extension("wav");
 
-		if let Err(error) = Self::create_target_dir(&target_dir) {
-			return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
-		};
+				if let Err(error) = Self::create_target_dir(&target_dir) {
+					return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
+				};
 
-		if let Err(error) = fs::write(&src_file, self.get_audio_wav(self.loop_end()).unwrap()) {
-			return Err(format!("Error writing source file {:?}\n{}", src_file, error))
-		};
+				match self.get_audio_wav(self.loop_end()) {
+					Ok(bytes) => {
+						if let Err(error) = fs::write(&src_file, bytes) {
+							return Err(format!("Error writing source file {:?}\n{}", src_file, error))
+						}
+					},
+					Err(error) => return Err(format!("Error decoding audio\n{}", error))
+				}
 
-		let nus3_encoded_raw = self.vgaudio_cli_decode(&src_file, &dest_file, settings)?;
+				let nus3_encoded_raw = self.vgaudio_cli_decode(&src_file, &dest_file, settings)?;
 
-		Ok(nus3_encoded_raw)
+				Ok(nus3_encoded_raw)
+			}
+		}
 	}
 
 	/// Try to empty and create the target directory. This should be in the cache directory,

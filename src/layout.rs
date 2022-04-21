@@ -68,7 +68,7 @@ pub fn lay_widgets(window: &mut Window, menu: &mut MenuBar, play: &mut Button, s
 
 /// Lays out property widgets given the window size.
 #[allow(clippy::too_many_arguments)]
-pub fn lay_prop_widgets(window: &mut Window, name_input: &mut Input, idsp_radio: &mut RadioRoundButton, lopus_radio: &mut RadioRoundButton, loop_toggle: &mut CheckButton, loop_from_input: &mut IntInput, loop_to_input: &mut IntInput, save_button: &mut Button) {
+pub fn lay_prop_widgets(window: &mut Window, name_input: &mut Input, idsp_radio: &mut RadioRoundButton, lopus_radio: &mut RadioRoundButton, bin_radio: &mut RadioRoundButton, loop_toggle: &mut CheckButton, loop_from_input: &mut IntInput, loop_to_input: &mut IntInput, save_button: &mut Button) {
 	let window_width = window.width();
 	let window_height = window.height();
 
@@ -92,6 +92,8 @@ pub fn lay_prop_widgets(window: &mut Window, name_input: &mut Input, idsp_radio:
 	idsp_radio.set_size((window_width / 2) - MARGIN * 2, RADIO_HEIGHT);
 	lopus_radio.set_pos(MARGIN, unallocated.y + RADIO_HEIGHT + MARGIN * 2);
 	lopus_radio.set_size((window_width / 2) - MARGIN * 2, RADIO_HEIGHT);
+	bin_radio.set_pos(MARGIN, unallocated.y + RADIO_HEIGHT * 2 + MARGIN * 3);
+	bin_radio.set_size((window_width / 2) - MARGIN * 2, RADIO_HEIGHT);
 	unallocated.x_bump(window_width / 2);
 
 	// Place the loop toggle

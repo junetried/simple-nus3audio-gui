@@ -198,6 +198,12 @@ impl Playback {
 						// Check if anything is selected
 						if let Some(index) = selected {
 							let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
+
+							// Refuse to attempt playing anything that isn't audio
+							if list_item.extension == crate::list::AudioExtension::Bin {
+								return Err("File is not audio or could not be read as audio.".to_owned())
+							}
+
 							self.loop_points_seconds = *list_item.loop_points_seconds();
 
 							// Create the sound settings

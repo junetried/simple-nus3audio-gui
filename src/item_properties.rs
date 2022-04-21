@@ -27,6 +27,7 @@ use crate::{
 #[derive(Clone)]
 enum PropMessage {
 	ReLay,
+	BinRadio,
 	ToggleLoop,
 	Save
 }
@@ -38,7 +39,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 	let mut window = Window::new(parent.x(), parent.y(), 350, 125, Some("Properties"))
 		.with_label(&format!("Properties of {}", &item.name));
 	window.make_resizable(true);
-	window.size_range(350, 125, 0, 0);
+	window.size_range(350, 170, 0, 0);
 
 	let mut name_input = Input::default();
 	name_input.set_tooltip("Unique name of the sound");
@@ -49,11 +50,19 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 		.with_label("IDSP format");
 	idsp_radio.set_tooltip("Used for lower-quality sound effects");
 	idsp_radio.toggle(item.extension == AudioExtension::Idsp);
+	idsp_radio.emit(s.clone(), PropMessage::BinRadio);
 
 	let mut lopus_radio = RadioRoundButton::default()
 		.with_label("LOPUS format");
 	lopus_radio.set_tooltip("Used for high-quality music");
 	lopus_radio.toggle(item.extension == AudioExtension::Lopus);
+	lopus_radio.emit(s.clone(), PropMessage::BinRadio);
+
+	let mut bin_radio = RadioRoundButton::default()
+		.with_label("Binary data");
+	bin_radio.set_tooltip("Any data which is not audio");
+	bin_radio.toggle(item.extension == AudioExtension::Bin);
+	bin_radio.emit(s.clone(), PropMessage::BinRadio);
 
 	// Create the loop toggle button
 	let mut loop_toggle = CheckButton::default()
@@ -97,7 +106,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 	});
 
 	window.end();
-	layout::lay_prop_widgets(&mut window, &mut name_input, &mut idsp_radio, &mut lopus_radio, &mut loop_toggle, &mut loop_from_input, &mut loop_to_input, &mut save_button);
+	layout::lay_prop_widgets(&mut window, &mut name_input, &mut idsp_radio, &mut lopus_radio,  &mut bin_radio, &mut loop_toggle, &mut loop_from_input, &mut loop_to_input, &mut save_button);
 	window.show();
 
 	let mut apply = false;
@@ -107,7 +116,17 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 		app::wait();
 		if let Some(e) = r.recv() {
 			match e {
-				PropMessage::ReLay => layout::lay_prop_widgets(&mut window, &mut name_input, &mut idsp_radio, &mut lopus_radio, &mut loop_toggle, &mut loop_from_input, &mut loop_to_input, &mut save_button),
+				PropMessage::ReLay => layout::lay_prop_widgets(&mut window, &mut name_input, &mut idsp_radio, &mut lopus_radio, &mut bin_radio, &mut loop_toggle, &mut loop_from_input, &mut loop_to_input, &mut save_button),
+				PropMessage::BinRadio => {
+					if bin_radio.is_toggled() {
+						loop_toggle.set_checked(false);
+						loop_toggle.deactivate();
+						loop_from_input.deactivate();
+						loop_to_input.deactivate()
+					} else {
+						loop_toggle.activate();
+					}
+				},
 				PropMessage::ToggleLoop => {
 					if item.loop_points().is_some() {
 						loop_from_input.deactivate();
@@ -125,10 +144,12 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 						alert(&window, "Loop points must be positive.");
 						continue
 					}
-					// End can't be before beginning
-					if loop_from_input.value().parse::<usize>().unwrap_or(0) >= loop_to_input.value().parse().unwrap_or(1) {
-						alert(&window, "Loop beginning must be placed before loop end.");
-						continue
+					if loop_toggle.is_checked() {
+						// End can't be before beginning
+						if loop_from_input.value().parse::<usize>().unwrap_or(0) >= loop_to_input.value().parse().unwrap_or(0) {
+							alert(&window, "Loop beginning must be placed before loop end.");
+							continue
+						}
 					}
 					apply = true;
 					window.hide()
@@ -142,7 +163,11 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 		let mut modified = false;
 
 		let new_name = name_input.value();
-		let new_extension = if idsp_radio.is_toggled() { AudioExtension::Idsp } else { AudioExtension::Lopus };
+		let new_extension = {
+			if idsp_radio.is_toggled() { AudioExtension::Idsp }
+			else if lopus_radio.is_toggled() { AudioExtension::Lopus }
+			else { AudioExtension::Bin }
+		};
 		let new_loop = if loop_toggle.is_checked() {
 			Some((loop_from_input.value().parse().unwrap_or(0), loop_to_input.value().parse().unwrap_or(0)))
 		} else {

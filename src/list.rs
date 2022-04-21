@@ -450,7 +450,7 @@ impl ListItem {
 
 	/// Decode `src_file` to a WAV file as bytes.
 	/// 
-	/// Might use vgmstream or VGAudioCli depending on which one is available to use.
+	/// Might use vgmstream or VGAudio Cli depending on which one is available to use.
 	fn decode(&self, src_file: &Path, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
 		if settings.prefer_vgmstream_decode() {
 			if !settings.vgmstream_path().is_empty() {

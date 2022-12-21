@@ -150,7 +150,7 @@ impl Playback {
 
 	/// Queue the slider update.
 	fn queue_update(sender: fltk::app::Sender<crate::Message>) {
-		fltk::app::add_timeout(UPDATE_FREQUENCY, move || sender.send(crate::Message::Update))
+		fltk::app::add_timeout3(UPDATE_FREQUENCY, move |_| sender.send(crate::Message::Update));
 	}
 
 	/// Try to play the currently selected sound.

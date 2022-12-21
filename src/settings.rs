@@ -67,7 +67,7 @@ const CONFIGURE_RUNTIME_MESSAGE: &str = "Please set the path to the executable u
 This executable will be given the path to the VGAudioCli executable, immediately followed by arguments passed to it.
 It is recommended to use mono or dotnet over wine.";
 
-pub struct Settings (pub toml::map::Map<String, toml::Value>);
+pub struct Settings (pub toml::map::Map<String, toml::Value>, bool);
 
 impl Default for Settings {
 	fn default() -> Self {
@@ -100,7 +100,7 @@ impl Settings {
 			map.insert(PREFER_VGMSTREAM_DECODE.to_owned(), toml::Value::Boolean(PREFER_VGMSTREAM_DECODE_DEFAULT));
 		}
 
-		Self (map)
+		Self (map, false)
 	}
 
 	/// Return a deserialized settings file, or the default.
@@ -192,15 +192,17 @@ impl Settings {
 
 	/// Save these settings. Never returns an error, but prints errors to stderr.
 	pub fn save(&self) {
-		if let Err(error) = Self::create_settings() {
-			eprintln!("Error creating settings: {}", error)
-		} else {
-			match toml::to_string(&self.0) {
-				Ok(string) => {
-					let _ = fs::write(CONFIG.as_path(), string);
-				},
-				Err(error) => {
-					eprintln!("Error serializing settings: {}", error)
+		if self.1 {
+			if let Err(error) = Self::create_settings() {
+				eprintln!("Error creating settings: {}", error)
+			} else {
+				match toml::to_string(&self.0) {
+					Ok(string) => {
+						let _ = fs::write(CONFIG.as_path(), string);
+					},
+					Err(error) => {
+						eprintln!("Error serializing settings: {}", error)
+					}
 				}
 			}
 		}
@@ -219,7 +221,8 @@ Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss",
 				sender.send(crate::Message::ConfigureVGAudioCliPath)
 			}
 
-			self.set_first_time(false)
+			self.set_first_time(false);
+			self.1 = true
 		}
 	}
 
@@ -262,6 +265,7 @@ Then, visit \"File → Configure VGAudioCli\" to set this location.", "Dismiss",
 
 		if let Some(new_value) = input(window, message, default) {
 			self.0.insert(key.to_owned(), toml::Value::String(new_value));
+			self.1 = true
 		}
 	}
 

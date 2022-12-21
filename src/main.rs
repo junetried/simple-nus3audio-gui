@@ -327,7 +327,7 @@ fn main() {
 						file_list.path = Some(file_dialog.filename());
 
 						// Add the files to the list
-						for file in nus3audio.files {
+						for (index, file) in nus3audio.files.into_iter().enumerate() {
 							let mut item = ListItem::new(file.name.clone());
 							let mut item_name = file.name;
 
@@ -348,6 +348,7 @@ fn main() {
 							item_name.push_str(&format!(".{}", item.extension));
 
 							file_list.add_item(item, &item_name);
+							file_list.update_label_of(index)
 						};
 
 						file_list.redraw();
@@ -407,6 +408,8 @@ fn main() {
 								continue
 							}
 
+							file_list.update_label_of(index);
+
 							if let Err(error) = fs::write(target_file, &raw.unwrap()) {
 								fltk::dialog::message_title("Error");
 								alert(&window, &error.to_string());
@@ -446,6 +449,8 @@ fn main() {
 								},
 								Err(error) => skipped.push_str(&format!("{}: {}\n", sound_name, error))
 							}
+
+							file_list.update_label_of(index);
 							
 							index += 1
 						}
@@ -460,7 +465,8 @@ fn main() {
 				},
 				Message::Add => {
 					let item = ListItem::new(format!("new_sound_{}", file_list.items.len() + 1));
-					file_list.add_item(item, &format!("new_sound_{}.idsp", file_list.items.len() + 1))
+					file_list.add_item(item, &format!("new_sound_{}.idsp", file_list.items.len() + 1));
+					file_list.update_label_of(file_list.items.len() - 1)
 				},
 				Message::Remove => {
 					if let Some((index, _)) = file_list.selected() {
@@ -471,7 +477,7 @@ fn main() {
 					}
 				},
 				Message::Properties => {
-					let (index, name, extension) = if let Some((index, _)) = file_list.selected() {
+					let (index, _, _) = if let Some((index, _)) = file_list.selected() {
 						let list_item = file_list.items.get_mut(index).expect("Failed to find internal list item");
 
 						if item_properties::configure(list_item, &window) {
@@ -486,7 +492,7 @@ fn main() {
 					};
 
 					// Update the label of the item
-					file_list.set_label_of(index, &format!("{}.{}", name, extension));
+					file_list.update_label_of(index);
 
 					// Update the progress slider in case we were playing anything
 					playback.on_update()
@@ -500,6 +506,8 @@ fn main() {
 							alert(&window, &error.to_string());
 							continue
 						}
+						// Update the label of the item
+						file_list.update_label_of(index);
 						window.set_cursor(Cursor::Default);
 					} else {
 						fltk::dialog::message_title("Alert");

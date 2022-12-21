@@ -160,8 +160,6 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 
 	// Window has been closed, so now apply the settings
 	if apply {
-		let mut modified = false;
-
 		let new_name = name_input.value();
 		let new_extension = {
 			if idsp_radio.is_toggled() { AudioExtension::Idsp }
@@ -174,11 +172,16 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 			None
 		};
 
-		if item.name == new_name && item.extension == new_extension && *item.loop_points() == new_loop { } else { modified = true }
-
-		item.name = new_name;
-		item.extension = new_extension;
-		item.set_loop_points(new_loop);
-		modified
+		if item.name == new_name && item.extension == new_extension && *item.loop_points() == new_loop {
+			false
+		} else {
+			if item.extension != new_extension || *item.loop_points() == new_loop {
+				item.clear_bytes();
+			}
+			item.name = new_name;
+			item.extension = new_extension;
+			item.set_loop_points(new_loop);
+			true
+		}
 	} else { false }
 }

@@ -145,14 +145,14 @@ fn main() {
 	);
 	menu.add_emit(
 		"&Edit/&Add sound\t",
-		Shortcut::empty(),
+		Shortcut::Ctrl | '=',
 		MenuFlag::Normal,
 		s,
 		Message::Add,
 	);
 	menu.add_emit(
 		"&Edit/Re&move selected sound\t",
-		Shortcut::empty(),
+		Shortcut::Ctrl | '-',
 		MenuFlag::Normal,
 		s,
 		Message::Remove,

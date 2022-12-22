@@ -395,9 +395,9 @@ impl ListItem {
 						};
 						self.bytes_raw = Some(raw);
 						self.audio_raw = Some(decoded);
-						self.set_loop_points(loop_points);
 						self.channels = header.channel_count;
 						self.sample_rate = header.sampling_rate;
+						self.set_loop_points(loop_points);
 
 						Ok(())
 					},

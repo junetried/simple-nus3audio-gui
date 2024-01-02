@@ -79,7 +79,9 @@ pub enum Message {
 	/// Open the online manual.
 	Manual,
 	/// Quit the application.
-	Quit(i32)
+	Quit(i32),
+	/// Do nothing.
+	NoOp
 }
 
 const NAME: &str = "simple-nus3audio-gui";
@@ -220,6 +222,13 @@ fn main() {
 		MenuFlag::Normal,
 		s,
 		Message::Manual,
+	);
+	menu.add_emit(
+		&format!("&Help/Version {}\t", env!("CARGO_PKG_VERSION")),
+		Shortcut::empty(),
+		MenuFlag::Normal,
+		s,
+		Message::NoOp,
 	);
 
 	// Playback
@@ -589,7 +598,8 @@ fn main() {
 						fltk::app::quit();
 						std::process::exit(code)
 					}
-				}
+				},
+				Message::NoOp => {}
 			}
 		}
 	}

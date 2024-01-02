@@ -360,6 +360,7 @@ impl ListItem {
 
 		self.audio_raw = Some(decoded);
 		self.set_loop_points(None);
+		self.bytes_raw = None;
 		Ok(())
 	}
 

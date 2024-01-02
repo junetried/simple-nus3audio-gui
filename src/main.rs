@@ -546,7 +546,7 @@ fn main() {
 
 					if !save_dialog.filename().to_string_lossy().is_empty() {
 						window.set_cursor(Cursor::Wait);
-						if let Err(error) = file_list.save_nus3audio(Some(&save_dialog.filename()), &settings) {
+						if let Err(error) = file_list.save_nus3audio(Some(save_dialog.filename()), &settings) {
 							fltk::dialog::message_title("Error");
 							window.set_cursor(Cursor::Default);
 							alert(&window, &format!("Error saving file:\n{}", error));

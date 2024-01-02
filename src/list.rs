@@ -154,8 +154,8 @@ impl List {
 	/// Save this nus3audio to the file at `self.path`.
 	/// 
 	/// Marks this list as being unmodified.
-	pub fn save_nus3audio(&mut self, path: Option<&Path>, settings: &crate::settings::Settings) -> Result<(), String> {
-		let path = if let Some(path) = path { path } else { self.path.as_ref().expect("No path has been set to save.") };
+	pub fn save_nus3audio(&mut self, path: Option<PathBuf>, settings: &crate::settings::Settings) -> Result<(), String> {
+		let path = if let Some(path) = path { path } else { self.path.clone().expect("No path has been set to save.") };
 		let name = path.file_name().unwrap().to_string_lossy().to_string();
 		let mut nus3audio = Nus3audioFile::new();
 
@@ -172,6 +172,12 @@ impl List {
 
 		let mut export: Vec<u8> = Vec::new();
 		nus3audio.write(&mut export);
+
+		// Update label, after potentially encoding some items
+		// that were empty previously
+		for index in 0..self.items.len() {
+			self.update_label_of(index)
+		}
 
 		if let Err(error) = fs::write(path.with_extension("nus3audio"), &export) {
 			Err(error.to_string())
@@ -459,33 +465,30 @@ impl ListItem {
 	pub fn get_nus3_encoded_raw(&mut self, nus3audio_name: &str, extension: &str, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
 		if self.audio_raw.is_none() { return Err("Audio of selected item is empty".to_owned()) }
 
-		match &self.bytes_raw {
-			Some(bytes) => {
-				return Ok(bytes.clone())
-			},
-			_ => {
-				// Need to convert the wav
-				let target_dir = CACHEDIR.join(nus3audio_name);
-				let dest_file = target_dir.join(&self.name).with_extension(extension);
-				let src_file = dest_file.with_extension("wav");
+		if let Some(bytes) = &self.bytes_raw {
+			return Ok(bytes.clone())
+		} else {
+			// Need to convert the wav
+			let target_dir = CACHEDIR.join(nus3audio_name);
+			let dest_file = target_dir.join(&self.name).with_extension(extension);
+			let src_file = dest_file.with_extension("wav");
 
-				if let Err(error) = Self::create_target_dir(&target_dir) {
-					return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
-				};
+			if let Err(error) = Self::create_target_dir(&target_dir) {
+				return Err(format!("Error creating cache subdirectory {:?}\n{}", target_dir, error))
+			};
 
-				match self.get_audio_wav(self.loop_end()) {
-					Ok(bytes) => {
-						if let Err(error) = fs::write(&src_file, bytes) {
-							return Err(format!("Error writing source file {:?}\n{}", src_file, error))
-						}
-					},
-					Err(error) => return Err(format!("Error decoding audio\n{}", error))
-				}
-
-				let nus3_encoded_raw = self.vgaudio_cli_decode(&src_file, &dest_file, settings)?;
-
-				Ok(nus3_encoded_raw)
+			match self.get_audio_wav(self.loop_end()) {
+				Ok(bytes) => {
+					if let Err(error) = fs::write(&src_file, bytes) {
+						return Err(format!("Error writing source file {:?}\n{}", src_file, error))
+					}
+				},
+				Err(error) => return Err(format!("Error decoding audio\n{}", error))
 			}
+
+			self.bytes_raw = Some(self.vgaudio_cli_decode(&src_file, &dest_file, settings)?);
+
+			Ok(self.bytes_raw.as_ref().unwrap().clone())
 		}
 	}
 

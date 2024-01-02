@@ -564,7 +564,7 @@ fn main() {
 					settings.set_first_time(true);
 					settings.first_time_greeting(&window, s)
 				},
-				Message::Manual => { let _ = open::that("https://github.com/EthanWeegee/simple-nus3audio-gui/wiki/Usage-Manual"); },
+				Message::Manual => { let _ = open::that("https://github.com/junetried/simple-nus3audio-gui/wiki/Usage-Manual"); },
 				Message::Quit(code) => {
 					// True if we should quit
 					let response = if file_list.modified {

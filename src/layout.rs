@@ -21,9 +21,7 @@ use fltk::{
 		IntInput
 	},
 	// tree::Tree,
-	valuator::{
-		HorFillSlider
-	},
+	valuator::HorFillSlider,
 	window::Window
 };
 

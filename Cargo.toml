@@ -7,23 +7,23 @@ edition = "2018"
 
 [dependencies]
 # Un/Packing nus3audio files
-nus3audio = "^1.1"
+nus3audio = "1.2"
 # Audio playback
-kira = "0.7"
+kira = "0.8"
 # Audio decoding
-rodio = "0.16"
+rodio = "0.17"
 # TOML settings
-toml = "0.5.8"
+toml = "0.8"
 lazy_static = "1.4"
 # Getting a settings directory
-directories = "4"
+directories = "5.0"
 # Find one of mono, dotnet, or wine (On targets that are not Windows)
 #[cfg(not(target_os = "windows"))]
-which = "4"
+which = "5.0"
 # Open the browser
-open = "3"
+open = "5.0"
 # WAV encoding
-wav = "1"
+wav = "1.0"
 # Audio resampler
 fon = "0.6"
 # Reading vgmstream metadata output as JSON
@@ -31,4 +31,4 @@ json = "0.12"
 
 [dependencies.fltk]
 # Graphics toolkit
-version = "^1.2"
+version = "1.4"

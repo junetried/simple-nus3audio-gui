@@ -13,11 +13,13 @@ use kira::{
 			Error as CpalError
 		}
 	},
-	sound::static_sound::{
+	sound::{
 		PlaybackState,
-		StaticSoundData,
-		StaticSoundHandle,
-		StaticSoundSettings
+		static_sound::{
+			StaticSoundData,
+			StaticSoundHandle,
+			StaticSoundSettings
+		},
 	},
 	tween::{
 		Easing,
@@ -60,7 +62,9 @@ impl Playback {
 			command_capacity: 32,
 			sound_capacity: 8,
 			sub_track_capacity: 8,
-			clock_capacity: 1
+			clock_capacity: 1,
+			spatial_scene_capacity: 1,
+			modulator_capacity: 1
 		};
 		let main_track_builder = kira::track::TrackBuilder::default();
 		let backend_settings = ();
@@ -209,7 +213,10 @@ impl Playback {
 							// Create the sound settings
 							let mut settings = StaticSoundSettings::default();
 							if let Some((begin, _)) = self.loop_points_seconds {
-								settings.loop_behavior = Some(kira::LoopBehavior { start_position: begin });
+								settings.loop_region = Some(kira::sound::Region {
+									start: kira::sound::PlaybackPosition::Seconds(begin),
+									end: kira::sound::EndPosition::EndOfAudio
+								})
 							}
 
 							// Create the sound data

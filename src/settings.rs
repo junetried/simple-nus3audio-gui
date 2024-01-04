@@ -105,8 +105,8 @@ impl Settings {
 
 	/// Return a deserialized settings file, or the default.
 	pub fn new_default() -> Self {
-		match std::fs::read(CONFIG.as_path()) {
-			Ok(bytes) => match toml::from_slice::<toml::map::Map<String, toml::Value>>(&bytes) {
+		match std::fs::read_to_string(CONFIG.as_path()) {
+			Ok(s) => match toml::from_str::<toml::map::Map<String, toml::Value>>(&s) {
 				Ok(map) => return Self::from_default(map),
 				Err(error) => println!("couldn't read settings, skipping: {}", error)
 			},

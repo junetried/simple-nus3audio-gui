@@ -464,9 +464,11 @@ impl ListItem {
 		if self.audio_raw.is_none() { return Err("Audio of selected item is empty".to_owned()) }
 
 		if let Some(bytes) = &self.bytes_raw {
+			trace!("Encoded audio already exists for {}, returning it", self.name);
 			return Ok(bytes.clone())
 		} else {
 			// Need to convert the wav
+			trace!("Encoded audio does not already exist for {}, encoding it", self.name);
 			let target_dir = CACHEDIR.join(nus3audio_name);
 			let dest_file = target_dir.join(&self.name).with_extension(extension);
 			let src_file = dest_file.with_extension("wav");

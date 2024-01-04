@@ -86,7 +86,7 @@ pub enum Message {
 	NoOp
 }
 
-const NAME: &str = "simple-nus3audio-gui";
+const NAME: &str = env!("CARGO_PKG_NAME");
 const MANUAL_URL: &str = "https://github.com/junetried/simple-nus3audio-gui/wiki/Usage-Manual";
 
 fn main() {

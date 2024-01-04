@@ -404,7 +404,7 @@ impl ListItem {
 							Ok(decoded) => decoded,
 							Err(bitdepth) => return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
 						};
-						self.bytes_raw = Some(raw);
+						self.bytes_raw = Some(encoded);
 						self.audio_raw = Some(decoded);
 						self.channels = header.channel_count;
 						self.sample_rate = header.sampling_rate;

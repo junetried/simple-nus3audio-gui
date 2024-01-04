@@ -157,7 +157,8 @@ impl List {
 	/// 
 	/// Marks this list as being unmodified.
 	pub fn save_nus3audio(&mut self, path: Option<PathBuf>, settings: &crate::settings::Settings) -> Result<(), String> {
-		let path = if let Some(path) = path { path } else { self.path.clone().expect("No path has been set to save.") };
+		let path = if let Some(path) = path { path } else { self.path.clone().expect("No path has been set to save.") }
+			.with_extension("nus3audio");
 		let name = path.file_name().unwrap().to_string_lossy().to_string();
 		let mut nus3audio = Nus3audioFile::new();
 
@@ -181,7 +182,9 @@ impl List {
 			self.update_label_of(index)
 		}
 
-		if let Err(error) = fs::write(path.with_extension("nus3audio"), &export) {
+		info!("Writing {} to {:?}", name, path);
+
+		if let Err(error) = fs::write(path, &export) {
 			Err(error.to_string())
 		} else {
 			self.modified = false;

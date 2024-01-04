@@ -142,7 +142,7 @@ impl List {
 				return Err(format!("Could not decode file as audio:\n{}", error))
 			}
 
-			list_item.set_loop_points(ListItem::loop_points_of(&open_dialog.filename(), settings));
+			list_item.loop_points_samples = ListItem::loop_points_of(&open_dialog.filename(), settings);
 			self.modified = true;
 
 			Ok(())
@@ -247,9 +247,7 @@ pub struct ListItem {
 	/// There is no guarantee that this data is in any particular format.
 	bytes_raw: Option<Vec<u8>>,
 	/// Loop points of this sound in samples.
-	loop_points_samples: Option<(usize, usize)>,
-	/// Loop points of this sound in seconds.
-	loop_points_seconds: Option<(f64, f64)>,
+	pub loop_points_samples: Option<(usize, usize)>,
 	/// Length in samples of the sound.
 	pub length_in_samples: usize,
 	/// Sample rate of the sound.
@@ -267,7 +265,6 @@ impl ListItem {
 			audio_raw: None,
 			bytes_raw: None,
 			loop_points_samples: None,
-			loop_points_seconds: None,
 			length_in_samples: 0,
 			sample_rate: 12_000,
 			channels: 1
@@ -284,22 +281,16 @@ impl ListItem {
 		self.loop_points_samples.map(|(_, end)| end)
 	}
 
-	/// Return the loop points in seconds.
-	pub fn loop_points_seconds(&self) -> &Option<(f64, f64)> {
-		&self.loop_points_seconds
-	}
-
-	/// Set the loop points in samples.
-	pub fn set_loop_points(&mut self, loop_points: Option<(usize, usize)>) {
-		if let Some((begin, end)) = loop_points {
-			self.loop_points_seconds = Some((
-				begin as f64 / self.sample_rate as f64,
-				end as f64 / self.sample_rate as f64
-			));
+	/// Return the loop points in samples.
+	pub fn loop_points_samples(&self) -> Option<(i64, i64)> {
+		if let Some((begin, end)) = &self.loop_points_samples {
+			Some((
+				*begin as i64,
+				*end as i64
+			))
 		} else {
-			self.loop_points_seconds = None;
+			None
 		}
-		self.loop_points_samples = loop_points;
 	}
 
 	/// Attach new bytes to this item and attempt to decode them.
@@ -322,7 +313,7 @@ impl ListItem {
 			// This can't be decoded
 			eprintln!("Error decoding file: {}
   This is not fatal, this file's bytes have been loaded directly. If this is not desired, make sure this file is a known format and is not corrupted.", error);
-			self.set_loop_points(None);
+			self.loop_points_samples = None;
 			self.extension = AudioExtension::Bin;
 			self.audio_raw = None;
 			self.bytes_raw = Some(raw_copy);
@@ -365,7 +356,7 @@ impl ListItem {
 		self.channels = channel_count;
 
 		self.audio_raw = Some(decoded);
-		self.set_loop_points(None);
+		self.loop_points_samples = None;
 		self.bytes_raw = None;
 		Ok(())
 	}
@@ -404,7 +395,7 @@ impl ListItem {
 						self.audio_raw = Some(decoded);
 						self.channels = header.channel_count;
 						self.sample_rate = header.sampling_rate;
-						self.set_loop_points(loop_points);
+						self.loop_points_samples = loop_points;
 
 						Ok(())
 					},
@@ -418,7 +409,7 @@ impl ListItem {
 				self.bytes_raw = Some(encoded);
 				self.audio_raw = None;
 				self.extension = AudioExtension::Bin;
-				self.set_loop_points(None);
+				self.loop_points_samples = None;
 				Ok(())
 			}
 		}

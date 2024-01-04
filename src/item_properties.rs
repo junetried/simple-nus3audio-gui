@@ -180,7 +180,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 			}
 			item.name = new_name;
 			item.extension = new_extension;
-			item.set_loop_points(new_loop);
+			item.loop_points_samples = new_loop;
 			true
 		}
 	} else { false }

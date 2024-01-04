@@ -14,6 +14,8 @@ use kira::{
 		}
 	},
 	sound::{
+		EndPosition,
+		PlaybackPosition,
 		PlaybackState,
 		static_sound::{
 			StaticSoundData,
@@ -47,8 +49,8 @@ pub struct Playback {
 	audio_manager: Result<AudioManager, CpalError>,
 	/// Playback handle.
 	playing_handle: Option<StaticSoundHandle>,
-	/// The loop points of the playing audio in seconds.
-	loop_points_seconds: Option<(f64, f64)>,
+	/// The loop points of the playing audio in samples.
+	loop_points_samples: Option<(i64, i64)>,
 	/// The index of the currently playing audio in the list it came from.
 	current_playing_index: Option<usize>,
 	/// App sender.
@@ -102,7 +104,7 @@ impl Playback {
 			playing: false,
 			audio_manager,
 			playing_handle: None,
-			loop_points_seconds: None,
+			loop_points_samples: None,
 			current_playing_index: None,
 			sender
 		}
@@ -208,14 +210,14 @@ impl Playback {
 								return Err("File is not audio or could not be read as audio.".to_owned())
 							}
 
-							self.loop_points_seconds = *list_item.loop_points_seconds();
+							self.loop_points_samples = list_item.loop_points_samples();
 
 							// Create the sound settings
 							let mut settings = StaticSoundSettings::default();
-							if let Some((begin, _)) = self.loop_points_seconds {
+							if let Some((begin, end)) = self.loop_points_samples {
 								settings.loop_region = Some(kira::sound::Region {
-									start: kira::sound::PlaybackPosition::Seconds(begin),
-									end: kira::sound::EndPosition::EndOfAudio
+									start: PlaybackPosition::Samples(begin),
+									end: EndPosition::Custom(PlaybackPosition::Samples(end))
 								})
 							}
 
@@ -262,7 +264,7 @@ impl Playback {
 		self.play_widget.set_label(PLAY);
 		self.slider_widget.set_value(0.0);
 		self.playing = false;
-		self.loop_points_seconds = None;
+		self.loop_points_samples = None;
 		self.playing_handle = None
 	}
 

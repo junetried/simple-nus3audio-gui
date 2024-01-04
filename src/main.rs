@@ -20,6 +20,8 @@ use fltk::{
 	window::Window
 };
 use nus3audio::Nus3audioFile;
+#[allow(unused_imports)]
+use log::{ trace, debug, info, warn, error };
 use std::fs;
 use crate::{
 	layout::alert,
@@ -85,8 +87,14 @@ pub enum Message {
 }
 
 const NAME: &str = "simple-nus3audio-gui";
+const MANUAL_URL: &str = "https://github.com/junetried/simple-nus3audio-gui/wiki/Usage-Manual";
 
 fn main() {
+	env_logger::Builder::from_env(
+		env_logger::Env::default()
+			.default_filter_or("error,simple_nus3audio_gui=warn")
+	).init();
+	info!("{} version {}", NAME, env!("CARGO_PKG_VERSION"));
 	let app = app::App::default();
 	let (s, r) = app::channel();
 	let mut window = Window::new(0, 0, 250, 200, NAME);
@@ -273,6 +281,7 @@ fn main() {
 
 	// Create the settings if needed
 	if let Err(error) = Settings::create_settings() {
+		error!("{}", error);
 		// We won't exit in this case, but we'll probably have issues later
 		fltk::dialog::message_title("Error");
 		alert(&window, &format!("Error creating the settings directory:\n{}", error))
@@ -280,6 +289,7 @@ fn main() {
 
 	// And reset the cache
 	if let Err(error) = Settings::reset_cache() {
+		error!("{}", error);
 		fltk::dialog::message_title("Fatal Error");
 		alert(&window, &format!("Error creating the cache directory:\n{}", error));
 		std::process::exit(1)
@@ -348,6 +358,7 @@ fn main() {
 							}
 
 							if let Err(error) = item.from_encoded(&file_list.name, file.data, &settings) {
+								error!("{}", error);
 								fltk::dialog::message_title("Error");
 								window.set_cursor(Cursor::Default);
 								alert(&window, &format!("Could not decode {}:\n{}", item_name, error));
@@ -405,12 +416,17 @@ fn main() {
 							let target_file = target_file.with_extension(extension);
 
 							let raw = if extension == "wav" {
+								debug!("Export as wav audio");
 								list_item.get_audio_wav(None)
 							} else {
+								debug!("Export as idsp or lopus encoded audio");
 								list_item.get_nus3_encoded_raw(&file_list.name, extension, &settings)
 							};
 
+							info!("Exporting item to path {:?}", target_file);
+
 							if let Err(error) = raw {
+								error!("{}", error);
 								fltk::dialog::message_title("Error");
 								window.set_cursor(Cursor::Default);
 								alert(&window, &error.to_string());
@@ -420,6 +436,7 @@ fn main() {
 							file_list.update_label_of(index);
 
 							if let Err(error) = fs::write(target_file, &raw.unwrap()) {
+								error!("{}", error);
 								fltk::dialog::message_title("Error");
 								alert(&window, &error.to_string());
 							}
@@ -450,6 +467,7 @@ fn main() {
 									let target_file = save_dialog.filename().join(&format!("{}.wav", sound_name));
 
 									if let Err(error) = fs::write(target_file, raw) {
+										error!("{}", error);
 										fltk::dialog::message_title("Error");
 										window.set_cursor(Cursor::Default);
 										alert(&window, &format!("Error writing file:\n{}", error));
@@ -510,6 +528,7 @@ fn main() {
 					if let Some((index, _)) = file_list.selected() {
 						window.set_cursor(Cursor::Wait);
 						if let Err(error) = file_list.replace(index, &settings) {
+							error!("{}", error);
 							fltk::dialog::message_title("Error");
 							window.set_cursor(Cursor::Default);
 							alert(&window, &error.to_string());
@@ -527,6 +546,7 @@ fn main() {
 					if file_list.path.is_some() {
 						window.set_cursor(Cursor::Wait);
 						if let Err(error) = file_list.save_nus3audio(None, &settings) {
+							error!("{}", error);
 							fltk::dialog::message_title("Error");
 							window.set_cursor(Cursor::Default);
 							alert(&window, &format!("Error saving file:\n{}", error));
@@ -547,6 +567,7 @@ fn main() {
 					if !save_dialog.filename().to_string_lossy().is_empty() {
 						window.set_cursor(Cursor::Wait);
 						if let Err(error) = file_list.save_nus3audio(Some(save_dialog.filename()), &settings) {
+							error!("{}", error);
 							fltk::dialog::message_title("Error");
 							window.set_cursor(Cursor::Default);
 							alert(&window, &format!("Error saving file:\n{}", error));
@@ -558,6 +579,7 @@ fn main() {
 				},
 				Message::PlayPause => {
 					if let Err(error) = playback.on_press(&mut file_list) {
+						error!("{}", error);
 						fltk::dialog::message_title("Error");
 						alert(&window, &error);
 					}
@@ -573,7 +595,10 @@ fn main() {
 					settings.set_first_time(true);
 					settings.first_time_greeting(&window, s)
 				},
-				Message::Manual => { let _ = open::that("https://github.com/junetried/simple-nus3audio-gui/wiki/Usage-Manual"); },
+				Message::Manual => {
+					info!("Opening manual at {}", MANUAL_URL);
+					let _ = open::that(MANUAL_URL);
+				},
 				Message::Quit(code) => {
 					// True if we should quit
 					let response = if file_list.modified {
@@ -594,7 +619,11 @@ fn main() {
 
 					if response {
 						settings.save();
-						Settings::reset_cache().expect("Failed to reset the cache directory");
+						if let Err(error) = Settings::reset_cache() {
+							error!("Failed to reset the cache directory");
+							error!("{}", error);
+							std::process::exit(1)
+						}
 						fltk::app::quit();
 						std::process::exit(code)
 					}
@@ -605,5 +634,9 @@ fn main() {
 	}
 
 	settings.save();
-	Settings::reset_cache().expect("Failed to reset the cache directory")
+	if let Err(error) = Settings::reset_cache() {
+		error!("Failed to reset the cache directory");
+		error!("{}", error);
+		std::process::exit(1)
+	}
 }

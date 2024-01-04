@@ -28,6 +28,9 @@ wav = "1.0"
 fon = "0.6"
 # Reading vgmstream metadata output as JSON
 json = "0.12"
+# Logging
+env_logger = "0.10.1"
+log = { version = "0.4.8", features = ["std"] }
 
 [dependencies.fltk]
 # Graphics toolkit

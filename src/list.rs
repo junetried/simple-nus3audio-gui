@@ -15,6 +15,8 @@ use fltk::{
 	dialog::{ FileDialogType, NativeFileChooser }
 };
 use rodio::Source;
+#[allow(unused_imports)]
+use log::{ trace, debug, info, warn, error };
 use crate::settings::CACHEDIR;
 
 /// [nus3audio] has AudioFile::filename to do exactly this, but
@@ -311,7 +313,7 @@ impl ListItem {
 		let decoder = rodio::Decoder::new(cursor);
 		if let Err(error) = decoder {
 			// This can't be decoded
-			eprintln!("Error decoding file: {}
+			warn!("Error decoding file: {}
   This is not fatal, this file's bytes have been loaded directly. If this is not desired, make sure this file is a known format and is not corrupted.", error);
 			self.loop_points_samples = None;
 			self.extension = AudioExtension::Bin;
@@ -355,6 +357,11 @@ impl ListItem {
 		self.sample_rate = sample_rate;
 		self.channels = channel_count;
 
+		debug!("Successfully decoded audio");
+		if decoder_sample_rate != sample_rate {
+			warn!("Sample rate has been changed! Input file was {} Hz and decoded file is {} Hz", decoder_sample_rate, sample_rate);
+			warn!("If you plan to set loop points, export this item as a wav and check your loop points, otherwise they WILL be wrong!")
+		}
 		self.audio_raw = Some(decoded);
 		self.loop_points_samples = None;
 		self.bytes_raw = None;
@@ -404,7 +411,7 @@ impl ListItem {
 			},
 			Err(error) => {
 				// Could not be decoded, assume this is binary data
-			eprintln!("Error decoding file: {}
+			warn!("Error decoding file: {}
   This is not fatal, this file's bytes have been loaded directly. If this is not desired, make sure this file is a known format and is not corrupted.", error);
 				self.bytes_raw = Some(encoded);
 				self.audio_raw = None;
@@ -478,6 +485,8 @@ impl ListItem {
 			}
 
 			self.bytes_raw = Some(self.vgaudio_cli_decode(&src_file, &dest_file, settings)?);
+
+			debug!("Encoded {:?} to {:?}", src_file, dest_file);
 
 			Ok(self.bytes_raw.as_ref().unwrap().clone())
 		}
@@ -575,6 +584,8 @@ impl ListItem {
 			command.arg("-l").arg(format!("{}-{}", from, to)).arg("--cbr").arg("--opusheader").arg("namco");
 		}
 
+		debug!("Running {:?}", command);
+
 		let output = command.output();
 
 		let output = if let Err(error) = output {
@@ -611,6 +622,28 @@ impl ListItem {
 
 				return Err(error)
 			}
+
+			let stdout = String::from_utf8(output.stdout);
+			let stderr = String::from_utf8(output.stderr);
+
+			if let Ok(out) = stdout {
+				if out.is_empty() {
+					debug!("stdout is empty")
+				} else {
+					debug!("stdout is:\n{}", out)
+				}
+			} else {
+				debug!("stdout couldn't be read")
+			}
+			if let Ok(err) = stderr {
+				if err.is_empty() {
+					debug!("stderr is empty")
+				} else {
+					debug!("stderr is:\n{}", err)
+				}
+			} else {
+				debug!("stderr couldn't be read")
+			}
 		} else {
 			return Err("Attempted running VGAudioCli, didn't get any exit code".to_string())
 		}
@@ -634,6 +667,8 @@ impl ListItem {
 		// -m: print metadata only, don't decode
 		// -I: print requested file info as JSON
 			.arg(src_file);
+
+		debug!("Running {:?}", command);
 
 		// Run the command
 		let output = command.output();
@@ -691,6 +726,8 @@ impl ListItem {
 		// -m: print metadata only, don't decode
 		// -I: print requested file info as JSON
 			.arg(src_file);
+
+		debug!("Running {:?}", command);
 
 		// Run the command
 		let output = command.output();

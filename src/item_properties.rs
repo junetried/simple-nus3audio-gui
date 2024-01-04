@@ -13,6 +13,8 @@ use fltk::{
 	},
 	window::Window
 };
+#[allow(unused_imports)]
+use log::{ trace, debug, info, warn, error };
 use crate::{
 	list::{
 		AudioExtension,
@@ -171,6 +173,10 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 		} else {
 			None
 		};
+
+		trace!("Name changed? {}", new_name != item.name);
+		trace!("Extension changed? {}", new_extension != item.extension);
+		trace!("Loop points changed? {}", new_loop != *item.loop_points());
 
 		if item.name == new_name && item.extension == new_extension && *item.loop_points() == new_loop {
 			false

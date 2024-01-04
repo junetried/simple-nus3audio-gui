@@ -175,7 +175,7 @@ pub fn configure(item: &mut ListItem, parent: &Window) -> bool {
 		if item.name == new_name && item.extension == new_extension && *item.loop_points() == new_loop {
 			false
 		} else {
-			if item.extension != new_extension || *item.loop_points() == new_loop {
+			if item.extension != new_extension || *item.loop_points() != new_loop {
 				item.clear_bytes();
 			}
 			item.name = new_name;

@@ -1,4 +1,4 @@
-/// A circle
+/// Rect helper struct.
 pub struct Rect {
 	pub x: i32,
 	pub y: i32,

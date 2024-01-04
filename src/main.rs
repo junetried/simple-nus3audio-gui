@@ -2,7 +2,7 @@ mod item_properties;
 mod layout;
 mod list;
 mod playback;
-mod rect;
+mod util;
 mod settings;
 
 use fltk::{

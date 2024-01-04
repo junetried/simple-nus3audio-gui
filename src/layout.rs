@@ -1,7 +1,7 @@
 //! Code to lay the buttons out.
 //! 
 //! Necessary since fltk does not cleanly handle resizing events.
-use crate::rect::Rect;
+use crate::util::Rect;
 use fltk::{
 	prelude::*,
 	browser::Browser,

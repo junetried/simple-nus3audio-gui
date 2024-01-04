@@ -17,7 +17,10 @@ use fltk::{
 use rodio::Source;
 #[allow(unused_imports)]
 use log::{ trace, debug, info, warn, error };
-use crate::settings::CACHEDIR;
+use crate::{
+	settings::CACHEDIR,
+	util::human_readable_size
+};
 
 /// [nus3audio] has AudioFile::filename to do exactly this, but
 /// VGAudioCli seems to create lopus files without the header
@@ -452,6 +455,8 @@ impl ListItem {
 			// I don't honestly know when this can fail...
 			if let Err(error) = wav::write(header, &wav::BitDepth::Sixteen(raw.to_vec()), &mut wav_cursor) { return Err(error.to_string())};
 
+			debug!("Got wav file from raw audio (output is {})", human_readable_size(wav_file.len() as u64));
+
 			Ok(wav_file)
 		} else {
 			if self.bytes_raw.is_none() {
@@ -654,7 +659,10 @@ impl ListItem {
 		}
 
 		match fs::read(dest_file) {
-			Ok(bytes) => Ok(bytes),
+			Ok(bytes) => {
+				debug!("Got VGAudioCli output (output is {})", human_readable_size(bytes.len() as u64));
+				Ok(bytes)
+			},
 			Err(error) => Err(format!("Error reading destination file {:?}\n{}", dest_file, error))
 		}
 	}
@@ -714,6 +722,8 @@ impl ListItem {
 				return Err(error)
 			}
 		}
+
+		debug!("Decoded with vgmstream (output is {})", human_readable_size(output.stdout.len() as u64));
 
 		Ok(output.stdout)
 	}

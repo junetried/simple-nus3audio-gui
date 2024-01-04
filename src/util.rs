@@ -32,3 +32,19 @@ impl Rect {
 		value
 	}
 }
+
+/// Return a human-readable data size from a number of bytes.
+pub fn human_readable_size(bytes: u64) -> String {
+	if bytes < 1_000 {
+		format!("{} bytes", bytes)
+	} else {
+		let kilobytes = bytes as f64 / 1_000.0;
+		if kilobytes < 1_000.0 {
+			format!("{} KB", kilobytes)
+		} else {
+			let megabytes = kilobytes / 1_000.0;
+			// This is as high as we'll go for now.
+			format!("{} MB", megabytes)
+		}
+	}
+}

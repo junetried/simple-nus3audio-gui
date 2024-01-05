@@ -1,6 +1,7 @@
 use std::{
 	fs,
 	io::Cursor,
+	num::NonZeroUsize,
 	path::{ Path, PathBuf },
 	process::Command
 };
@@ -14,10 +15,10 @@ use fltk::{
 	browser::Browser,
 	dialog::{ FileDialogType, NativeFileChooser }
 };
-use rodio::Source;
 #[allow(unused_imports)]
 use log::{ trace, debug, info, warn, error };
 use crate::{
+	codec::{ EncodedFile, EncodingType },
 	settings::CACHEDIR,
 	util::human_readable_size
 };
@@ -129,19 +130,20 @@ impl List {
 			// Set the last path used to the path we just used
 			self.browser_path = open_dialog.filename().parent().map(|path| path.to_owned());
 
-			let raw = fs::read(open_dialog.filename());
-			if let Err(error) = raw {
+			let bytes = fs::read(open_dialog.filename());
+			if let Err(error) = bytes {
 				return Err(format!("Could not read file:\n{}", error))
 			}
-			let raw = raw.unwrap();
+			let bytes = bytes.unwrap();
 
 			let result = if let Some(extension) = open_dialog.filename().extension() {
 				match extension.to_str() {
-					Some("idsp") => { list_item.from_encoded(&self.name, raw, settings) },
-					Some("lopus") => { list_item.from_encoded(&self.name, raw, settings) },
-					_ => list_item.set_audio_raw(raw)
+					Some("idsp") => { list_item.from_encoded(&self.name, bytes, settings) },
+					Some("lopus") => { list_item.from_encoded(&self.name, bytes, settings) },
+					Some(e) => list_item.set_audio_from_bytes(bytes, EncodingType::from_extension(e)),
+					None => list_item.set_audio_from_bytes(bytes, EncodingType::Bin)
 				}
-			} else { list_item.set_audio_raw(raw) };
+			} else { list_item.set_audio_from_bytes(bytes, EncodingType::Bin) };
 
 			if let Err(error) = result {
 				return Err(format!("Could not decode file as audio:\n{}", error))
@@ -215,7 +217,7 @@ impl List {
 	pub fn set_label_of(&mut self, line: usize, text: &str) {
 		let mut text = text.to_owned();
 		// Append a status if the item isn't complete
-		match (self.items[line].audio_raw.is_some(), self.items[line].bytes_raw.is_some()) {
+		match (self.items[line].audio_file.is_some(), self.items[line].bytes_raw.is_some()) {
 			(true, true) => {},
 			(true, false) => text.push_str(" (Not yet encoded)"),
 			(false, true) => text.push_str(" (Could not decode)"),
@@ -249,9 +251,9 @@ pub struct ListItem {
 	pub name: String,
 	/// The extension of the audio in this nus3audio file.
 	pub extension: AudioExtension,
-	/// Raw audio, in wav format.
-	pub audio_raw: Option<Vec<i16>>,
-	/// Raw, unconverted bytes.
+	/// Raw file.
+	pub audio_file: Option<EncodedFile>,
+	/// Converted bytes.
 	/// There is no guarantee that this data is in any particular format.
 	bytes_raw: Option<Vec<u8>>,
 	/// Loop points of this sound in samples.
@@ -270,7 +272,7 @@ impl ListItem {
 		Self {
 			name,
 			extension: AudioExtension::Idsp,
-			audio_raw: None,
+			audio_file: None,
 			bytes_raw: None,
 			loop_points_samples: None,
 			length_in_samples: 0,
@@ -301,74 +303,10 @@ impl ListItem {
 		}
 	}
 
-	/// Attach new bytes to this item and attempt to decode them.
-	pub fn set_audio_raw(&mut self, raw: Vec<u8>) -> Result<(), String> {
-		// If we can't decode these bytes, we'll just clear the audio data and set the bytes later
-		let raw_copy = raw.clone();
-
-		let cursor = Cursor::new(raw);
-
-		// It would be nice to use Kira for this,
-		// but it seems to coerce everything into dual channel,
-		// which isn't ideal.
-		// 
-		// I've considered using the Symphonia crate, but it looks far
-		// too complicated to use for something otherwise so simple.
-		// For example, this is the basic "decoding audio" mock-up:
-		// https://github.com/pdeljanov/Symphonia/blob/master/symphonia/examples/getting-started.rs#L53
-		let decoder = rodio::Decoder::new(cursor);
-		if let Err(error) = decoder {
-			// This can't be decoded
-			warn!("Error decoding file: {}
-  This is not fatal, this file's bytes have been loaded directly. If this is not desired, make sure this file is a known format and is not corrupted.", error);
-			self.loop_points_samples = None;
-			self.extension = AudioExtension::Bin;
-			self.audio_raw = None;
-			self.bytes_raw = Some(raw_copy);
-			return Ok(())
-			
-		};
-		let decoder = decoder.unwrap();
-
-		let decoder_sample_rate = decoder.sample_rate();
-		// The lopus format only supports these sample rates
-		let sample_rate = if decoder_sample_rate <= 8_000 {8_000}
-		else if decoder_sample_rate <= 12_000 {12_000}
-		else if decoder_sample_rate <= 16_000 {16_000}
-		else if decoder_sample_rate <= 24_000 {24_000}
-		else {48_000};
-
-		let channel_count = if decoder.channels() == 1 { 1 } else { 2 };
-
-		let mut decoded: Vec<i16> = decoder.collect();
-
-		if decoder_sample_rate != sample_rate {
-			// Need to resample
-			if channel_count == 1 {
-				let input = fon::Audio::<fon::chan::Ch16, 1>::with_i16_buffer(decoder_sample_rate, decoded);
-
-				let mut output = fon::Audio::<fon::chan::Ch16, 1>::with_audio(sample_rate, &input);
-
-				decoded = output.as_i16_slice().to_vec()
-			} else {
-				let input = fon::Audio::<fon::chan::Ch16, 2>::with_i16_buffer(decoder_sample_rate, decoded);
-
-				let mut output = fon::Audio::<fon::chan::Ch16, 2>::with_audio(sample_rate, &input);
-
-				decoded = output.as_i16_slice().to_vec()
-			}
-		}
-
-		self.length_in_samples = decoded.len() / channel_count as usize;
-		self.sample_rate = sample_rate;
-		self.channels = channel_count;
-
-		debug!("Successfully decoded audio");
-		if decoder_sample_rate != sample_rate {
-			warn!("Sample rate has been changed! Input file was {} Hz and decoded file is {} Hz", decoder_sample_rate, sample_rate);
-			warn!("If you plan to set loop points, export this item as a wav and check your loop points, otherwise they WILL be wrong!")
-		}
-		self.audio_raw = Some(decoded);
+	/// Attach new audio to this item.
+	pub fn set_audio_from_bytes(&mut self, bytes: Vec<u8>, encoding: EncodingType) -> Result<(), String> {
+		let decoded = EncodedFile::from_bytes_with_encoding(bytes, encoding);
+		self.audio_file = Some(decoded);
 		self.loop_points_samples = None;
 		self.bytes_raw = None;
 		Ok(())
@@ -400,12 +338,11 @@ impl ListItem {
 				// Check that the wav could be read
 				match wav_result {
 					Ok((header, bitdepth)) => {
-						let decoded = match bitdepth.try_into_sixteen() {
-							Ok(decoded) => decoded,
-							Err(bitdepth) => return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
+						if let Err(bitdepth) = bitdepth.try_into_sixteen() {
+							return Err(format!("Error reading returned wav\nWrong bit depth found: {:?}", bitdepth))
 						};
 						self.bytes_raw = Some(encoded);
-						self.audio_raw = Some(decoded);
+						self.audio_file = Some(EncodedFile::from_bytes_with_encoding(raw, EncodingType::WAV));
 						self.channels = header.channel_count;
 						self.sample_rate = header.sampling_rate;
 						self.loop_points_samples = loop_points;
@@ -420,7 +357,7 @@ impl ListItem {
 			warn!("Error decoding file: {}
   This is not fatal, this file's bytes have been loaded directly. If this is not desired, make sure this file is a known format and is not corrupted.", error);
 				self.bytes_raw = Some(encoded);
-				self.audio_raw = None;
+				self.audio_file = None;
 				self.extension = AudioExtension::Bin;
 				self.loop_points_samples = None;
 				Ok(())
@@ -433,31 +370,23 @@ impl ListItem {
 		self.bytes_raw = None
 	}
 
-	/// Return the audio from this item in WAV format. Yes, this is hacky.
+	/// Return the audio from this item in WAV format.
 	/// 
 	/// Optionally take the length in samples that should be used.
 	pub fn get_audio_wav(&self, end: Option<usize>) -> Result<Vec<u8>, String> {
-		if let Some(raw) = &self.audio_raw {
-			// Make the header
-			let header = wav::Header::new(wav::WAV_FORMAT_PCM, self.channels, self.sample_rate, 16);
-			// Create the empty vec
-			let mut wav_file: Vec<u8> = Vec::new();
-			// And the cursor to write to it
-			let mut wav_cursor = Cursor::new(&mut wav_file);
-			// Get the raw slice if there is a specific sample limit
-			let raw = &raw[0..if let Some(end) = end {
-				let sample_length = end * self.channels as usize;
-				if raw.len() < sample_length { raw.len() } else { sample_length }
-			} else {
-				raw.len()
-			}];
-			// Finally, write the wav file
-			// I don't honestly know when this can fail...
-			if let Err(error) = wav::write(header, &wav::BitDepth::Sixteen(raw.to_vec()), &mut wav_cursor) { return Err(error.to_string())};
-
-			debug!("Got wav file from raw audio (output is {})", human_readable_size(wav_file.len() as u64));
-
-			Ok(wav_file)
+		if let Some(file) = &self.audio_file {
+			let end = match end {
+				Some(e) if e != 0 => Some(
+					unsafe {
+						NonZeroUsize::new_unchecked(e)
+					}
+				),
+				_ => None
+			};
+			match file.to_wav(end) {
+				Ok(wav) => Ok(wav),
+				Err(error) => Err(format!("{}", error))
+			}
 		} else {
 			if self.bytes_raw.is_none() {
 				Err("Selected item is empty".to_owned())
@@ -469,7 +398,7 @@ impl ListItem {
 
 	/// Return the bytes associated with this item. If it has audio but no bytes, the audio is converted according to `extension`.
 	pub fn get_nus3_encoded_raw(&mut self, nus3audio_name: &str, extension: &str, settings: &crate::settings::Settings) -> Result<Vec<u8>, String> {
-		if self.audio_raw.is_none() { return Err("Audio of selected item is empty".to_owned()) }
+		if self.audio_file.is_none() { return Err("Audio of selected item is empty".to_owned()) }
 
 		if let Some(bytes) = &self.bytes_raw {
 			trace!("Encoded audio already exists for {}, returning it", self.name);

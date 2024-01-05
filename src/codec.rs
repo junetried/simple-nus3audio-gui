@@ -39,6 +39,17 @@ impl EncodingType {
 			_ => true
 		}
 	}
+
+	/// Return an EncodingType from the given extension.
+	pub fn from_extension(extension: &str) -> Self {
+		match &extension.to_lowercase()[..] {
+			"ogg" => Self::Ogg,
+			"flac" => Self::FLAC,
+			"wav" => Self::WAV,
+			"mp3" => Self::MP3,
+			_ => Self::Bin
+		}
+	}
 }
 
 /// An encoded file.

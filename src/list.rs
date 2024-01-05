@@ -118,7 +118,7 @@ impl List {
 		};
 
 		let mut open_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
-		open_dialog.set_filter("*.{ogg,flac,wav,mp3,idsp,lopus}\n*.ogg\n*.flac\n*.wav\n*.mp3\n*.idsp\n*.lopus\n*");
+		open_dialog.set_filter(crate::AUDIO_FILES_DECODE_FILTER);
 		// Set the default path to the last path used
 		if let Some(path) = &self.browser_path {
 			let _ = open_dialog.set_directory(path);

@@ -89,6 +89,25 @@ pub enum Message {
 const NAME: &str = env!("CARGO_PKG_NAME");
 const MANUAL_URL: &str = "https://github.com/junetried/simple-nus3audio-gui/wiki/Usage-Manual";
 
+/// Filter for audio files we can decode for the FLTK file dialog.
+const AUDIO_FILES_DECODE_FILTER: &str =
+"*All audio files	.{ogg,flac,wav,mp3,idsp,lopus}
+OGG files	*.ogg
+FLAC files	*.flac
+WAV files	*.wav
+MP3 files	*.mp3
+IDSP files	*.idsp
+LOPUS files	*.lopus";
+
+/// Filter for audio files we can encode for the FLTK file dialog.
+const AUDIO_FILES_ENCODE_FILTER: &str =
+"WAV files	*.wav
+IDSP files	*.idsp
+LOPUS files	*.lopus";
+
+/// Filter for nus3audio files.
+const NUS3AUDIO_FILTER: &str = "NUS3AUDIO files	*.nus3audio";
+
 fn main() {
 	env_logger::Builder::from_env(
 		env_logger::Env::default()
@@ -309,7 +328,7 @@ fn main() {
 				},
 				Message::Open => {
 					let mut file_dialog = NativeFileChooser::new(FileDialogType::BrowseFile);
-					file_dialog.set_filter("*.nus3audio");
+					file_dialog.set_filter(NUS3AUDIO_FILTER);
 					// Get file selection
 					file_dialog.show();
 
@@ -381,7 +400,7 @@ fn main() {
 
 						let (filter, default) = match list_item.extension {
 							list::AudioExtension::Bin => ("*", "bin"),
-							_ => ("*.wav\n*.idsp\n*.lopus", "wav")
+							_ => (AUDIO_FILES_ENCODE_FILTER, "wav")
 						};
 
 						// Make the default file name the sound's name, with ".wav" as the extension

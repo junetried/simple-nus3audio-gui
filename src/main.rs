@@ -1,3 +1,4 @@
+mod codec;
 mod item_properties;
 mod layout;
 mod list;

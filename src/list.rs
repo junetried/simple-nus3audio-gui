@@ -217,11 +217,17 @@ impl List {
 	pub fn set_label_of(&mut self, line: usize, text: &str) {
 		let mut text = text.to_owned();
 		// Append a status if the item isn't complete
-		match (self.items[line].audio_file.is_some(), self.items[line].bytes_raw.is_some()) {
-			(true, true) => {},
-			(true, false) => text.push_str(" (Not yet encoded)"),
-			(false, true) => text.push_str(" (Could not decode)"),
-			(false, false) => text.push_str(" (Empty)")
+		match 
+			(self.items[line].audio_file.is_some(),
+			self.items[line].bytes_raw.is_some(),
+			self.items[line].audio_file.as_ref().map(|file| file.encoding == EncodingType::Bin).unwrap_or(false))
+		{
+			(true, true, false) => {},
+			(true, false, false) => text.push_str(" (Not yet encoded)"),
+			(true, false, true) => text.push_str(" (Could not decode)"),
+			(false, true, _) => text.push_str(" (Could not decode)"),
+			(false, false, _) => text.push_str(" (Empty)"),
+			(true, true, true) => unreachable!()
 		}
 		self.widget.set_text(line as i32 + 1, &text)
 	}
@@ -356,8 +362,8 @@ impl ListItem {
 				// Could not be decoded, assume this is binary data
 			warn!("Error decoding file: {}
   This is not fatal, this file's bytes have been loaded directly. If this is not desired, make sure this file is a known format and is not corrupted.", error);
-				self.bytes_raw = Some(encoded);
-				self.audio_file = None;
+				self.bytes_raw = None;
+				self.audio_file = Some(EncodedFile::from_bytes_with_encoding(encoded, EncodingType::Bin));
 				self.extension = AudioExtension::Bin;
 				self.loop_points_samples = None;
 				Ok(())
@@ -404,7 +410,15 @@ impl ListItem {
 			trace!("Encoded audio already exists for {}, returning it", self.name);
 			return Ok(bytes.clone())
 		} else {
-			// Need to convert the wav
+			if self.audio_file.as_ref().unwrap().encoding == EncodingType::Bin {
+				if self.extension != AudioExtension::Bin {
+					return Err("Item is not in bin format, but imported file is".to_owned())
+				} else {
+					trace!("{} is set to a binary file, returning it", self.name);
+					return Ok(self.audio_file.as_ref().unwrap().bytes.clone())
+				}
+			}
+			// Need to convert the file
 			trace!("Encoded audio does not already exist for {}, encoding it", self.name);
 			let target_dir = CACHEDIR.join(nus3audio_name);
 			let dest_file = target_dir.join(&self.name).with_extension(extension);

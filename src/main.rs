@@ -92,7 +92,7 @@ const MANUAL_URL: &str = "https://github.com/junetried/simple-nus3audio-gui/wiki
 
 /// Filter for audio files we can decode for the FLTK file dialog.
 const AUDIO_FILES_DECODE_FILTER: &str =
-"*All audio files	.{ogg,flac,wav,mp3,idsp,lopus}
+"All audio files	*.{ogg,flac,wav,mp3,idsp,lopus}
 OGG files	*.ogg
 FLAC files	*.flac
 WAV files	*.wav

@@ -90,7 +90,7 @@ impl Playback {
 		slider_widget.set_tooltip("Position of the playing audio");
 		slider_widget.set_callback(move |c| c.emit(sender, crate::Message::Seek));
 		slider_widget.deactivate();
-		slider_widget.set_selection_color(fltk::enums::Color::Blue);
+		slider_widget.set_selection_color(fltk::enums::Color::DarkBlue);
 		slider_widget.set_minimum(0.0);
 		slider_widget.set_maximum(1.0);
 		slider_widget.set_step(1.0, 1);

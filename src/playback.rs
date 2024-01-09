@@ -89,7 +89,7 @@ impl Playback {
 		let mut slider_widget = HorFillSlider::default();
 		slider_widget.set_tooltip("Position of the playing audio");
 		slider_widget.set_callback(move |c| c.emit(sender, crate::Message::Seek));
-		// slider_widget.deactivate();
+		slider_widget.deactivate();
 		slider_widget.set_selection_color(fltk::enums::Color::Blue);
 		slider_widget.set_minimum(0.0);
 		slider_widget.set_maximum(1.0);
@@ -127,9 +127,11 @@ impl Playback {
 				self.slider_widget.set_value(handle.position());
 				// No need to run more updates if it's paused
 				if handle.state() != PlaybackState::Playing {
+					self.slider_widget.deactivate();
 					self.playing = false;
 					self.play_widget.set_label(PLAY)
 				} else {
+					self.slider_widget.activate();
 					Self::queue_update(self.sender)
 				}
 				self.slider_widget.redraw()
@@ -178,6 +180,7 @@ impl Playback {
 					Some(handle) if handle.state() != PlaybackState::Stopped && ( selected.is_none() || selected == self.current_playing_index ) => {
 						// Already have a playback handle
 						if handle.state() == PlaybackState::Paused {
+							self.slider_widget.activate();
 							self.play_widget.set_label(PAUSE);
 							self.playing = true;
 							if let Err(error) = handle.resume(Tween::default()) {
@@ -186,6 +189,7 @@ impl Playback {
 							Self::queue_update(self.sender);
 							Ok(())
 						} else {
+							self.slider_widget.deactivate();
 							self.play_widget.set_label(PLAY);
 							if let Err(error) = handle.pause(Tween::default()) {
 								return Err(error.to_string())

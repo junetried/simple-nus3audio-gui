@@ -381,14 +381,7 @@ impl ListItem {
 	/// Optionally take the length in samples that should be used.
 	pub fn get_audio_wav(&self, end: Option<usize>) -> Result<Vec<u8>, String> {
 		if let Some(file) = &self.audio_file {
-			let end = match end {
-				Some(e) if e != 0 => Some(
-					unsafe {
-						NonZeroUsize::new_unchecked(e)
-					}
-				),
-				_ => None
-			};
+			let end = end.and_then(|e| NonZeroUsize::new(e));
 			match file.to_wav(end) {
 				Ok(wav) => Ok(wav),
 				Err(error) => Err(format!("{}", error))
